@@ -16,7 +16,7 @@ const inputCls =
 const labelCls = "text-xs font-semibold text-zinc-600 dark:text-zinc-300";
 const hintCls = "text-[11px] text-zinc-500 dark:text-zinc-400";
 
-type RowStatus = "idle" | "swapping" | "done" | "error";
+type RowStatus = "idle" | "swapping" | "done" | "not_fired" | "error";
 
 export default function AutoswapPage() {
   const toast = useToast();
@@ -54,16 +54,28 @@ export default function AutoswapPage() {
     setRowStatus((prev) => ({ ...prev, [match.user_id]: "swapping" }));
     try {
       const res = await autoswapComplete(match.username, option);
-      markAutoswapped(match.user_id, match.secret, res.outcome);
-      setRowStatus((prev) => ({ ...prev, [match.user_id]: "done" }));
-      if (res.outcome === "swapped") {
-        toast.success(`${match.username} swapped`, res.replacement ? `Replacement: ${res.replacement}` : undefined);
-      } else if (res.outcome === "moved") {
-        toast.success(`${match.username} moved out`, "No replacement was free to take its slot.");
-      } else {
-        toast.info(`${match.username}: not fired`, "Wrong rule, rule paused, or no replacement free. Safe to retry.");
+      // Only "swapped"/"moved" are real progress — mark done and drop off the
+      // pending list. "not_fired" means AccountOps did nothing at all (wrong
+      // rule, rule paused, or — most commonly — this account isn't assigned
+      // to the Config that rule number lives on yet), so it must stay
+      // pending and NOT be recorded as handled, or a real swap would never
+      // get another chance to run.
+      if (res.outcome === "swapped" || res.outcome === "moved") {
+        markAutoswapped(match.user_id, match.secret, res.outcome);
+        setRowStatus((prev) => ({ ...prev, [match.user_id]: "done" }));
+        if (res.outcome === "swapped") {
+          toast.success(`${match.username} swapped`, res.replacement ? `Replacement: ${res.replacement}` : undefined);
+        } else {
+          toast.success(`${match.username} moved out`, "No replacement was free to take its slot.");
+        }
+        return true;
       }
-      return true;
+      setRowStatus((prev) => ({ ...prev, [match.user_id]: "not_fired" }));
+      toast.info(
+        `${match.username}: not fired`,
+        "Nothing changed — check that this account is assigned to the right Autoswap Config in AccountOps, and that the rule number matches its position there (1 = first rule, 2 = second). Safe to retry.",
+      );
+      return false;
     } catch (err) {
       setRowStatus((prev) => ({ ...prev, [match.user_id]: "error" }));
       toast.error(`Couldn't swap ${match.username}`, err instanceof Error ? err.message : String(err));
@@ -182,22 +194,45 @@ export default function AutoswapPage() {
               return (
                 <div
                   key={`${match.user_id}-${match.secret}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
+                  className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
                 >
-                  <div className="min-w-0">
-                    <span className="font-medium">{match.display_name || match.username}</span>{" "}
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">@{match.username}</span>
-                    <span className="ml-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
-                      Unbound {match.secret}
-                    </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-medium">{match.display_name || match.username}</span>{" "}
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">@{match.username}</span>
+                      <span className="ml-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
+                        Unbound {match.secret}
+                      </span>
+                      {status === "not_fired" && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                          Not fired
+                        </span>
+                      )}
+                      {status === "error" && (
+                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-400">
+                          Failed
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => swapOne(match)}
+                      disabled={status === "swapping" || runningAll}
+                      className="shrink-0 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-semibold text-fuchsia-600 transition-colors hover:border-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/40 dark:bg-white/5 dark:text-fuchsia-400"
+                    >
+                      {status === "swapping"
+                        ? "Swapping…"
+                        : status === "error" || status === "not_fired"
+                          ? "Retry"
+                          : "Swap now"}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => swapOne(match)}
-                    disabled={status === "swapping" || runningAll}
-                    className="shrink-0 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-semibold text-fuchsia-600 transition-colors hover:border-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/40 dark:bg-white/5 dark:text-fuchsia-400"
-                  >
-                    {status === "swapping" ? "Swapping…" : status === "error" ? "Retry" : "Swap now"}
-                  </button>
+                  {status === "not_fired" && (
+                    <p className={`mt-1.5 ${hintCls}`}>
+                      Nothing changed in AccountOps. Most likely this account isn't assigned to the
+                      Autoswap Config that rule number lives on yet — check the Accounts/Devices page
+                      in AccountOps.
+                    </p>
+                  )}
                 </div>
               );
             })}
