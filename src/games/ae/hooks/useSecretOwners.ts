@@ -9,7 +9,7 @@ import { useAllUnits } from "./useAllUnits";
 export const SECRET_UNIT_NAMES = ["Shadow", "Crow"] as const;
 export type SecretUnitName = (typeof SECRET_UNIT_NAMES)[number];
 
-function isVariantOf(displayName: string, name: SecretUnitName): boolean {
+export function isVariantOf(displayName: string, name: SecretUnitName): boolean {
   return displayName === name || displayName.startsWith(`${name} (`);
 }
 

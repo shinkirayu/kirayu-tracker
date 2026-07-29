@@ -7,8 +7,14 @@ import { fmtFullNum, fmtNum, getPresenceLabel, onlineStatusTitle, prestigeRoman,
 import { BagIcon, CoinIcon, EmoteIcon, GunIcon, KnifeIcon, MaskIcon, PawIcon, RadioIcon } from "./icons";
 import { AssetImage } from "./AssetImage";
 
-/** Real in-game asset id for the current event's Seashells icon (catalog key SummerKey2026). */
-const SHELLS_ASSET_ID = "rbxassetid://126508703036392";
+/**
+ * The live game's own Seashells asset (catalog key SummerKey2026,
+ * rbxassetid://126508703036392) resolves to Roblox's "image unavailable"
+ * placeholder graphic via the thumbnails API (a private/unmoderated asset),
+ * so this uses the wiki's icon instead via the same Special:FilePath
+ * redirect pattern as lib/itemImages.ts.
+ */
+const SHELLS_ICON_URL = "https://murder-mystery-2.fandom.com/wiki/Special:FilePath/Shells.png";
 
 /** Memoized so a realtime patch to one row never re-renders the whole table. */
 export const AccountRow = memo(function AccountRow({
@@ -69,7 +75,7 @@ export const AccountRow = memo(function AccountRow({
       {columns.shells && (
         <td className="px-3 py-2.5 text-center align-middle tabular-nums text-cyan-600 dark:text-cyan-400">
           <span className="inline-flex items-center gap-1">
-            <AssetImage rbxAssetId={SHELLS_ASSET_ID} alt="Seashells" className="size-4" fallback="🐚" />
+            <AssetImage src={SHELLS_ICON_URL} alt="Seashells" className="size-4" fallback="🐚" />
             {fmtNum(account.shells)}
           </span>
         </td>
