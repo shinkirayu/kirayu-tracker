@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
 import { clearAutoswapRecord } from "../lib/autoswapHistory";
 import { unmarkAccountListed } from "../lib/listedAccounts";
+import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
 
 const hintCls = "text-[11px] text-zinc-500 dark:text-zinc-400";
 
@@ -21,20 +22,46 @@ export default function ProcessedAccountsPage() {
   const { accounts, isLoading } = useProcessedAccounts(version);
   const bump = () => setVersion((v) => v + 1);
 
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  function toggleSelect(userId: number): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+  function toggleSelectAll(): void {
+    setSelected((prev) => (prev.size === accounts.length ? new Set() : new Set(accounts.map((a) => a.user_id))));
+  }
+  function afterListingClosed(): void {
+    setSelected(new Set());
+    bump();
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-lg font-semibold tracking-tight">Processed Accounts</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Everything pulled out of farming via Autoswap, and everything already listed on
-          Eldorado/ZeusX — one place to track an account from "swapped out" to "sold."
+          Eldorado/ZeusX — select any of them below to list on Eldorado/ZeusX without leaving this page.
         </p>
       </div>
 
       <div className="max-w-3xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
-        <h3 className="font-display mb-3 text-sm font-semibold">
-          Accounts ({accounts.length}){isLoading && " — loading…"}
-        </h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-sm font-semibold">
+            Accounts ({accounts.length}){isLoading && " — loading…"}
+          </h3>
+          {selected.size > 0 && (
+            <MarketplaceListingBar
+              usernames={accounts.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
+              userIds={[...selected]}
+              onDone={afterListingClosed}
+            />
+          )}
+        </div>
 
         {accounts.length === 0 ? (
           <p className={hintCls}>
@@ -43,79 +70,90 @@ export default function ProcessedAccountsPage() {
           </p>
         ) : (
           <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={selected.size === accounts.length}
+                onChange={toggleSelectAll}
+                className="size-3.5 accent-fuchsia-500"
+              />
+              Select all
+            </label>
             {accounts.map((acc) => (
               <div
                 key={acc.user_id}
-                className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
+                className="flex flex-wrap items-center gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link
-                    to={`/ae/account/${acc.user_id}`}
-                    className="min-w-0 font-medium hover:text-fuchsia-600 dark:hover:text-fuchsia-400"
-                  >
-                    {acc.display_name || acc.username}{" "}
-                    <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">@{acc.username}</span>
-                  </Link>
+                <input
+                  type="checkbox"
+                  checked={selected.has(acc.user_id)}
+                  onChange={() => toggleSelect(acc.user_id)}
+                  className="size-3.5 shrink-0 accent-fuchsia-500"
+                />
+                <Link
+                  to={`/ae/account/${acc.user_id}`}
+                  className="min-w-0 flex-1 font-medium hover:text-fuchsia-600 dark:hover:text-fuchsia-400"
+                >
+                  {acc.display_name || acc.username}{" "}
+                  <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">@{acc.username}</span>
+                </Link>
 
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {acc.swapped && (
-                      <span
-                        title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {acc.swapped && (
+                    <span
+                      title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                    >
+                      Swapped ({acc.swapped.secret})
+                      <button
+                        onClick={() => {
+                          clearAutoswapRecord(acc.user_id);
+                          bump();
+                        }}
+                        title="Clear swap record"
+                        className="ml-0.5 text-fuchsia-400 hover:text-fuchsia-700 dark:hover:text-fuchsia-200"
                       >
-                        Swapped ({acc.swapped.secret})
-                        <button
-                          onClick={() => {
-                            clearAutoswapRecord(acc.user_id);
-                            bump();
-                          }}
-                          title="Clear swap record"
-                          className="ml-0.5 text-fuchsia-400 hover:text-fuchsia-700 dark:hover:text-fuchsia-200"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                    {acc.listed?.eldorado && (
-                      <span
-                        title={`Listed on Eldorado ${timeAgo(acc.listed.eldorado)}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {acc.listed?.eldorado && (
+                    <span
+                      title={`Listed on Eldorado ${timeAgo(acc.listed.eldorado)}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"
+                    >
+                      Eldorado
+                      <button
+                        onClick={() => {
+                          unmarkAccountListed(acc.user_id, "eldorado");
+                          bump();
+                        }}
+                        title="Clear Eldorado listed status"
+                        className="ml-0.5 text-purple-400 hover:text-purple-700 dark:hover:text-purple-200"
                       >
-                        Eldorado
-                        <button
-                          onClick={() => {
-                            unmarkAccountListed(acc.user_id, "eldorado");
-                            bump();
-                          }}
-                          title="Clear Eldorado listed status"
-                          className="ml-0.5 text-purple-400 hover:text-purple-700 dark:hover:text-purple-200"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                    {acc.listed?.zeusx && (
-                      <span
-                        title={`Listed on ZeusX ${timeAgo(acc.listed.zeusx)}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400"
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {acc.listed?.zeusx && (
+                    <span
+                      title={`Listed on ZeusX ${timeAgo(acc.listed.zeusx)}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400"
+                    >
+                      ZeusX
+                      <button
+                        onClick={() => {
+                          unmarkAccountListed(acc.user_id, "zeusx");
+                          bump();
+                        }}
+                        title="Clear ZeusX listed status"
+                        className="ml-0.5 text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-200"
                       >
-                        ZeusX
-                        <button
-                          onClick={() => {
-                            unmarkAccountListed(acc.user_id, "zeusx");
-                            bump();
-                          }}
-                          title="Clear ZeusX listed status"
-                          className="ml-0.5 text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-200"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                    {acc.lastActivity && (
-                      <span className={hintCls}>{timeAgo(acc.lastActivity)}</span>
-                    )}
-                  </div>
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {acc.lastActivity && <span className={hintCls}>{timeAgo(acc.lastActivity)}</span>}
                 </div>
               </div>
             ))}

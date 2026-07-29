@@ -15,6 +15,8 @@ import {
   type AutoswapOptions,
 } from "../lib/accountops";
 import { clearAllAutoswapHistory, markAutoswapped, type UnboundSecret } from "../lib/autoswapHistory";
+import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
+import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-200 bg-transparent p-2 text-sm outline-none focus:border-fuchsia-400 dark:border-zinc-700";
@@ -40,6 +42,25 @@ export default function AutoswapPage() {
   const [options, setOptions] = useState<AutoswapOptions>(() => getAutoswapOptions());
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({});
   const [runningAll, setRunningAll] = useState(false);
+
+  const { accounts: processed } = useProcessedAccounts(historyVersion);
+  const readyToList = processed.filter((a) => a.swapped && !a.listed?.eldorado && !a.listed?.zeusx);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  function toggleSelect(userId: number): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+  function toggleSelectAll(): void {
+    setSelected((prev) => (prev.size === readyToList.length ? new Set() : new Set(readyToList.map((a) => a.user_id))));
+  }
+  function afterListingClosed(): void {
+    setSelected(new Set());
+    setHistoryVersion((v) => v + 1);
+  }
 
   function resetPending(): void {
     clearAllAutoswapHistory();
@@ -363,6 +384,60 @@ export default function AutoswapPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      <div className="max-w-2xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-display text-sm font-semibold">Swapped — ready to list ({readyToList.length})</h3>
+          {selected.size > 0 && (
+            <MarketplaceListingBar
+              usernames={readyToList.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
+              userIds={[...selected]}
+              onDone={afterListingClosed}
+            />
+          )}
+        </div>
+
+        {readyToList.length === 0 ? (
+          <p className={hintCls}>
+            Accounts land here right after a successful swap above. Select one or more, then list them
+            on Eldorado/ZeusX without leaving this page.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={selected.size === readyToList.length}
+                onChange={toggleSelectAll}
+                className="size-3.5 accent-fuchsia-500"
+              />
+              Select all
+            </label>
+            {readyToList.map((acc) => (
+              <label
+                key={acc.user_id}
+                className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(acc.user_id)}
+                  onChange={() => toggleSelect(acc.user_id)}
+                  className="size-3.5 shrink-0 accent-fuchsia-500"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{acc.display_name || acc.username}</span>{" "}
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">@{acc.username}</span>
+                </span>
+                {acc.swapped && (
+                  <span className="shrink-0 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
+                    {acc.swapped.secret}
+                  </span>
+                )}
+              </label>
+            ))}
           </div>
         )}
       </div>
