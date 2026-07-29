@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { useAllUnits } from "./useAllUnits";
+import { useSecretOwners } from "./useSecretOwners";
 import { getAllAutoswapRecords, type AutoswapRecord } from "../lib/autoswapHistory";
 import { getAllListedRecords, type ListedRecord } from "../lib/listedAccounts";
+import type { SecretTraitEntry } from "../lib/types";
 
 export interface ProcessedAccount {
   user_id: number;
@@ -9,6 +11,13 @@ export interface ProcessedAccount {
   display_name: string | null;
   swapped: AutoswapRecord | null;
   listed: ListedRecord | null;
+  /**
+   * This account's Crow/Shadow + trait right now, read live off its tracked
+   * units — not the (possibly stale, possibly trait-less) snapshot saved at
+   * swap time. Prefer this for display; it's empty once the account no
+   * longer owns the unit (e.g. a fresh account has since taken its user_id).
+   */
+  liveSecretTraits: SecretTraitEntry[];
   /** Most recent timestamp across swap/listing activity — used to sort newest first. */
   lastActivity: string;
 }
@@ -21,10 +30,13 @@ export interface ProcessedAccount {
  * both are keyed by user_id only — so this cross-references them against
  * useAllUnits()'s existing aggregation (already fetches every tracked
  * account's owned units, so virtually every real account appears somewhere
- * in it).
+ * in it). Also pulls in useSecretOwners()'s live per-account trait data
+ * (same source as the Accounts/Units tabs) so a swap recorded before trait
+ * tracking existed can still show its current real trait instead of "—".
  */
 export function useProcessedAccounts(historyVersion = 0) {
   const { data: units, isLoading } = useAllUnits();
+  const { traits: liveTraits } = useSecretOwners();
 
   const accounts = useMemo<ProcessedAccount[]>(() => {
     const swapped = getAllAutoswapRecords();
@@ -58,13 +70,14 @@ export function useProcessedAccounts(historyVersion = 0) {
         display_name: identity?.display_name ?? null,
         swapped: swap,
         listed: list,
+        liveSecretTraits: liveTraits.get(userId) ?? [],
         lastActivity,
       });
     }
 
     return result.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [units, historyVersion]);
+  }, [units, liveTraits, historyVersion]);
 
   return { accounts, isLoading };
 }

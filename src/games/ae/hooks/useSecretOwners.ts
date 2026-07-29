@@ -18,6 +18,12 @@ function traitNameOf(unit: UnitEntry): string | null {
   return unit.Trait?.DisplayName ?? unit.Trait?.Trait ?? null;
 }
 
+/** "Unbound Crow" / "Unbound Crow + Unbound Shadow" — same format as autoswapHistory's formatAutoswapParts, but from live unit data instead of a stored record. */
+export function formatSecretTraitEntries(entries: SecretTraitEntry[] | undefined): string {
+  if (!entries || entries.length === 0) return "—";
+  return entries.map((e) => (e.trait ? `${e.trait} ${e.secret}` : e.secret)).join(" + ");
+}
+
 /**
  * Reuses useAllUnits()'s existing full-account-details aggregation (already
  * paid for by the Units tab) to derive, per Secret unit, the set of user_ids

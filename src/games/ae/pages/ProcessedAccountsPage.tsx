@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
+import { useProcessedAccounts, type ProcessedAccount } from "../hooks/useProcessedAccounts";
 import { clearAutoswapRecord, formatAutoswapParts } from "../lib/autoswapHistory";
 import { unmarkAccountListed } from "../lib/listedAccounts";
+import { formatSecretTraitEntries } from "../hooks/useSecretOwners";
 import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
 
 const hintCls = "text-[11px] text-zinc-500 dark:text-zinc-400";
+
+/** Prefer the account's live trait data (read straight off its tracked units, same source as the Accounts/Units tabs) over whatever was captured at swap time — that snapshot can be stale or, for swaps recorded before trait tracking existed, entirely trait-less. */
+function displayLabelFor(acc: ProcessedAccount): string {
+  return acc.liveSecretTraits.length > 0 ? formatSecretTraitEntries(acc.liveSecretTraits) : formatAutoswapParts(acc.swapped);
+}
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -24,10 +30,9 @@ export default function ProcessedAccountsPage() {
 
   const [swapFilter, setSwapFilter] = useState<string>("all");
   const swapFilterOptions = Array.from(
-    new Set(accounts.filter((a) => a.swapped).map((a) => formatAutoswapParts(a.swapped))),
+    new Set(accounts.filter((a) => a.swapped).map((a) => displayLabelFor(a))),
   ).sort();
-  const filtered =
-    swapFilter === "all" ? accounts : accounts.filter((a) => formatAutoswapParts(a.swapped) === swapFilter);
+  const filtered = swapFilter === "all" ? accounts : accounts.filter((a) => displayLabelFor(a) === swapFilter);
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
@@ -127,7 +132,7 @@ export default function ProcessedAccountsPage() {
                       title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
                       className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
                     >
-                      {formatAutoswapParts(acc.swapped)}
+                      {displayLabelFor(acc)}
                       <button
                         onClick={() => {
                           clearAutoswapRecord(acc.user_id);

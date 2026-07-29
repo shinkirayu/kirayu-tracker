@@ -21,8 +21,14 @@ import {
   type AutoswapPart,
   type UnboundSecret,
 } from "../lib/autoswapHistory";
-import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
+import { useProcessedAccounts, type ProcessedAccount } from "../hooks/useProcessedAccounts";
+import { formatSecretTraitEntries } from "../hooks/useSecretOwners";
 import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
+
+/** Prefer the account's live trait data (read straight off its tracked units, same source as the Accounts/Units tabs) over whatever was captured at swap time — that snapshot can be stale or, for swaps recorded before trait tracking existed, entirely trait-less. */
+function displayLabelFor(acc: ProcessedAccount): string {
+  return acc.liveSecretTraits.length > 0 ? formatSecretTraitEntries(acc.liveSecretTraits) : formatAutoswapParts(acc.swapped);
+}
 
 const inputCls =
   "w-full rounded-lg border border-zinc-200 bg-transparent p-2 text-sm outline-none focus:border-fuchsia-400 dark:border-zinc-700";
@@ -72,9 +78,9 @@ export default function AutoswapPage() {
   const { accounts: processed } = useProcessedAccounts(historyVersion);
   const readyToListAll = processed.filter((a) => a.swapped && !a.listed?.eldorado && !a.listed?.zeusx);
   const [swapFilter, setSwapFilter] = useState<string>("all");
-  const swapFilterOptions = Array.from(new Set(readyToListAll.map((a) => formatAutoswapParts(a.swapped)))).sort();
+  const swapFilterOptions = Array.from(new Set(readyToListAll.map((a) => displayLabelFor(a)))).sort();
   const readyToList =
-    swapFilter === "all" ? readyToListAll : readyToListAll.filter((a) => formatAutoswapParts(a.swapped) === swapFilter);
+    swapFilter === "all" ? readyToListAll : readyToListAll.filter((a) => displayLabelFor(a) === swapFilter);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
     setSelected((prev) => {
@@ -479,7 +485,7 @@ export default function AutoswapPage() {
                 </span>
                 {acc.swapped && (
                   <span className="shrink-0 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
-                    {formatAutoswapParts(acc.swapped)}
+                    {displayLabelFor(acc)}
                   </span>
                 )}
               </label>
