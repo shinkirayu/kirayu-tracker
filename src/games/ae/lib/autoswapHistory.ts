@@ -9,15 +9,24 @@ import type { AutoswapOutcome } from "./accountops";
  */
 
 export type UnboundSecret = "Crow" | "Shadow";
-/** "Both" — a distinct autoswap rule/folder for accounts that have both at once, higher-value than either alone. */
-export type UnboundLabel = UnboundSecret | "Both";
+
+/** One secret + the trait that made it swap-worthy — an account swapped for "Both" gets one part per secret, each with its own trait. */
+export interface AutoswapPart {
+  secret: UnboundSecret;
+  trait: string;
+}
 
 export interface AutoswapRecord {
-  secret: UnboundLabel;
-  /** Which trait triggered the swap (e.g. "Unbound") — whatever trait filter was active on the matching entry at the time. */
-  trait: string;
+  /** One part for a single-secret swap; two for a "Both" swap (one per secret). */
+  parts: AutoswapPart[];
   outcome: AutoswapOutcome;
   at: string;
+}
+
+/** "Unbound Crow" / "Unbound Crow + Unbound Shadow" — the exact string shown in badges and used as the filter dropdown's value. */
+export function formatAutoswapParts(parts: AutoswapPart[] | undefined): string {
+  if (!parts || parts.length === 0) return "—";
+  return parts.map((p) => `${p.trait} ${p.secret}`).join(" + ");
 }
 
 const STORAGE_KEY = "autoswapHistory";
@@ -48,9 +57,9 @@ export function isAlreadyAutoswapped(userId: number): boolean {
   return !!getAutoswapRecord(userId);
 }
 
-export function markAutoswapped(userId: number, secret: UnboundLabel, trait: string, outcome: AutoswapOutcome): void {
+export function markAutoswapped(userId: number, parts: AutoswapPart[], outcome: AutoswapOutcome): void {
   const all = readAll();
-  all[String(userId)] = { secret, trait, outcome, at: new Date().toISOString() };
+  all[String(userId)] = { parts, outcome, at: new Date().toISOString() };
   writeAll(all);
 }
 

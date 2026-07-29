@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [columns, setColumns] = useState<ColumnPrefs>(() => loadColumnPrefs());
   useEffect(() => saveColumnPrefs(columns), [columns]);
 
-  const { owners: secretOwners } = useSecretOwners();
+  const { owners: secretOwners, traits: secretTraits } = useSecretOwners();
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(
     effectiveFilters,
     secretOwners,
@@ -47,8 +47,9 @@ export default function DashboardPage() {
         ...a,
         hasShadow: secretOwners.Shadow.has(a.user_id),
         hasCrow: secretOwners.Crow.has(a.user_id),
+        secretTraits: secretTraits.get(a.user_id) ?? [],
       })),
-    [data, secretOwners],
+    [data, secretOwners, secretTraits],
   );
   useAccountsRealtime();
 

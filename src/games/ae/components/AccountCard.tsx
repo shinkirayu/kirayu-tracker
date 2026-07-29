@@ -114,10 +114,19 @@ export const AccountCard = memo(function AccountCard({
             {fmtNum(villainCoins?.Amount ?? 0)}
           </span>
         )}
-        {columns.secrets && (account.hasShadow || account.hasCrow) && (
-          <span className="inline-flex items-center gap-1">
-            {account.hasShadow && <span title="Owns Shadow">🌑</span>}
-            {account.hasCrow && <span title="Owns Crow">🐦‍⬛</span>}
+        {columns.secrets && account.secretTraits && account.secretTraits.length > 0 && (
+          <span className="inline-flex flex-wrap items-center gap-1">
+            {account.secretTraits.map((entry, i) => (
+              <span
+                key={`${entry.secret}-${entry.trait ?? "none"}-${i}`}
+                title={`${entry.trait ?? "No trait"} ${entry.secret}`}
+                className="inline-flex items-center gap-0.5 rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+              >
+                {entry.secret === "Shadow" ? "🌑" : "🐦‍⬛"}
+                {entry.trait ? `${entry.trait} ` : ""}
+                {entry.secret}
+              </span>
+            ))}
           </span>
         )}
         {columns.location && (

@@ -72,6 +72,14 @@ export interface AccountListRow {
   /** Client-computed from useSecretOwners(), not fetched — whether this account's tracked units include a Shadow/Crow secret. */
   hasShadow?: boolean;
   hasCrow?: boolean;
+  /** Client-computed from useSecretOwners() — every distinct (secret, trait) pair this account currently owns, e.g. "Unbound Crow". */
+  secretTraits?: SecretTraitEntry[];
+}
+
+export interface SecretTraitEntry {
+  secret: "Crow" | "Shadow";
+  /** null if that copy has no trait rolled at all. */
+  trait: string | null;
 }
 
 /** Full light row, fetched on the detail page. */

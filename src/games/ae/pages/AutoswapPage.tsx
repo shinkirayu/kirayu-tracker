@@ -14,7 +14,13 @@ import {
   saveAutoswapOptions,
   type AutoswapOptions,
 } from "../lib/accountops";
-import { clearAllAutoswapHistory, markAutoswapped, type UnboundSecret } from "../lib/autoswapHistory";
+import {
+  clearAllAutoswapHistory,
+  formatAutoswapParts,
+  markAutoswapped,
+  type AutoswapPart,
+  type UnboundSecret,
+} from "../lib/autoswapHistory";
 import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
 import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
 
@@ -32,10 +38,24 @@ function swappableSecrets(match: UnboundAccountMatch): UnboundSecret[] {
   return [...set];
 }
 
-/** Which trait(s) actually triggered the swap, read off the matching entries themselves (not the page's filter) so it's accurate even in "all traits" mode. */
-function traitLabelFor(match: UnboundAccountMatch): string {
-  const traits = new Set(match.entries.filter((e) => e.secret).map((e) => e.trait).filter((t): t is string => !!t));
-  return traits.size > 0 ? [...traits].join(" + ") : "—";
+/**
+ * One part per secret that actually triggered the swap (one for a single
+ * secret, two for "Both"), each carrying its own trait — read off the
+ * matching entries themselves (not the page's filter) so it's accurate even
+ * in "all traits" mode.
+ */
+function partsFor(match: UnboundAccountMatch): AutoswapPart[] {
+  const bySecret = new Map<UnboundSecret, Set<string>>();
+  for (const e of match.entries) {
+    if (!e.secret) continue;
+    const traits = bySecret.get(e.secret) ?? new Set<string>();
+    if (e.trait) traits.add(e.trait);
+    bySecret.set(e.secret, traits);
+  }
+  return Array.from(bySecret, ([secret, traits]) => ({
+    secret,
+    trait: traits.size > 0 ? [...traits].join(" + ") : "—",
+  }));
 }
 
 export default function AutoswapPage() {
@@ -52,11 +72,9 @@ export default function AutoswapPage() {
   const { accounts: processed } = useProcessedAccounts(historyVersion);
   const readyToListAll = processed.filter((a) => a.swapped && !a.listed?.eldorado && !a.listed?.zeusx);
   const [swapFilter, setSwapFilter] = useState<string>("all");
-  const swapFilterOptions = Array.from(
-    new Set(readyToListAll.map((a) => `${a.swapped!.trait} ${a.swapped!.secret}`)),
-  ).sort();
+  const swapFilterOptions = Array.from(new Set(readyToListAll.map((a) => formatAutoswapParts(a.swapped?.parts)))).sort();
   const readyToList =
-    swapFilter === "all" ? readyToListAll : readyToListAll.filter((a) => `${a.swapped!.trait} ${a.swapped!.secret}` === swapFilter);
+    swapFilter === "all" ? readyToListAll : readyToListAll.filter((a) => formatAutoswapParts(a.swapped?.parts) === swapFilter);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
     setSelected((prev) => {
@@ -121,7 +139,7 @@ export default function AutoswapPage() {
       // pending and NOT be recorded as handled, or a real swap would never
       // get another chance to run.
       if (res.outcome === "swapped" || res.outcome === "moved") {
-        markAutoswapped(match.user_id, label, traitLabelFor(match), res.outcome);
+        markAutoswapped(match.user_id, partsFor(match), res.outcome);
         setRowStatus((prev) => ({ ...prev, [match.user_id]: "done" }));
         if (res.outcome === "swapped") {
           toast.success(`${match.username} swapped`, res.replacement ? `Replacement: ${res.replacement}` : undefined);
@@ -461,7 +479,7 @@ export default function AutoswapPage() {
                 </span>
                 {acc.swapped && (
                   <span className="shrink-0 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
-                    {acc.swapped.trait} {acc.swapped.secret}
+                    {formatAutoswapParts(acc.swapped.parts)}
                   </span>
                 )}
               </label>

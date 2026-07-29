@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useProcessedAccounts } from "../hooks/useProcessedAccounts";
-import { clearAutoswapRecord } from "../lib/autoswapHistory";
+import { clearAutoswapRecord, formatAutoswapParts } from "../lib/autoswapHistory";
 import { unmarkAccountListed } from "../lib/listedAccounts";
 import { MarketplaceListingBar } from "../components/MarketplaceListingBar";
 
@@ -24,10 +24,10 @@ export default function ProcessedAccountsPage() {
 
   const [swapFilter, setSwapFilter] = useState<string>("all");
   const swapFilterOptions = Array.from(
-    new Set(accounts.filter((a) => a.swapped).map((a) => `${a.swapped!.trait} ${a.swapped!.secret}`)),
+    new Set(accounts.filter((a) => a.swapped).map((a) => formatAutoswapParts(a.swapped?.parts))),
   ).sort();
   const filtered =
-    swapFilter === "all" ? accounts : accounts.filter((a) => a.swapped && `${a.swapped.trait} ${a.swapped.secret}` === swapFilter);
+    swapFilter === "all" ? accounts : accounts.filter((a) => formatAutoswapParts(a.swapped?.parts) === swapFilter);
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
@@ -127,7 +127,7 @@ export default function ProcessedAccountsPage() {
                       title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
                       className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
                     >
-                      {acc.swapped.trait} {acc.swapped.secret}
+                      {formatAutoswapParts(acc.swapped.parts)}
                       <button
                         onClick={() => {
                           clearAutoswapRecord(acc.user_id);

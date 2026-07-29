@@ -114,11 +114,23 @@ export const AccountRow = memo(function AccountRow({
       )}
       {columns.secrets && (
         <td className="px-3 py-2.5 text-center align-middle">
-          <span className="inline-flex items-center justify-center gap-1 text-base">
-            {account.hasShadow && <span title="Owns Shadow">🌑</span>}
-            {account.hasCrow && <span title="Owns Crow">🐦‍⬛</span>}
-            {!account.hasShadow && !account.hasCrow && <span className="text-zinc-300 dark:text-zinc-700">—</span>}
-          </span>
+          {account.secretTraits && account.secretTraits.length > 0 ? (
+            <span className="inline-flex flex-wrap items-center justify-center gap-1">
+              {account.secretTraits.map((entry, i) => (
+                <span
+                  key={`${entry.secret}-${entry.trait ?? "none"}-${i}`}
+                  title={`${entry.trait ?? "No trait"} ${entry.secret}`}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                >
+                  {entry.secret === "Shadow" ? "🌑" : "🐦‍⬛"}
+                  {entry.trait ? `${entry.trait} ` : ""}
+                  {entry.secret}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="text-zinc-300 dark:text-zinc-700">—</span>
+          )}
         </td>
       )}
       {columns.standardPity && (
