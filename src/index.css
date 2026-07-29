@@ -1,0 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Montserrat:wght@500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800;900&family=Baloo+2:wght@500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Per-game font tokens — default is Anime Expeditions'/MM2's shared choice
+   (Fredoka display font), overridden inside .gtd-theme for GTD's own look.
+   Scoping through CSS variables (rather than clashing plain classes) is what
+   lets three previously-separate apps' `font-display`/`font-mono` utility
+   usage coexist in one stylesheet without one game's font silently winning
+   sitewide. */
+@theme {
+  --font-display: "Fredoka", ui-rounded, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-[#0a0a0c] dark:text-zinc-100;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Cheap virtualization: off-screen cards skip layout/paint entirely. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
+}
+
+/* ---- Anime Expeditions & Murder Mystery 2 in-game-style chrome ---- */
+.text-outline {
+  color: #fff;
+  text-shadow:
+    -1.5px -1.5px 0 #000,
+    1.5px -1.5px 0 #000,
+    -1.5px 1.5px 0 #000,
+    1.5px 1.5px 0 #000,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Anime Expeditions accents */
+.gradient-purple {
+  background-image: linear-gradient(180deg, #eb53ff 0%, #8113ff 100%);
+}
+.gradient-cyan {
+  background-image: linear-gradient(180deg, #1cffff 0%, #0099ff 100%);
+}
+
+/* Murder Mystery 2 accents */
+.gradient-blood {
+  background-image: linear-gradient(180deg, #ff3b3b 0%, #a50008 100%);
+}
+.gradient-steel {
+  background-image: linear-gradient(180deg, #d8dade 0%, #6a6a6a 100%);
+}
+.gradient-gold {
+  background-image: linear-gradient(180deg, #ffe066 0%, #c89a00 100%);
+}
+
+/* GTD's own farm-theme.css (scoped under .gtd-theme) covers its scrollbar/fonts. */
+
+/* ---- Shared shell (sidebar/top bar) retheme per active game ----
+   The chrome outside each game's own pages (App.tsx's Shell) reads these
+   vars so switching games re-skins the sidebar/header to match, then
+   switching to another game (or away, to /settings) switches it right back. */
+[data-shell-theme="ae"] {
+  --shell-accent: #b026d6;
+  --shell-accent-soft: rgba(176, 38, 214, 0.12);
+  --shell-gradient: linear-gradient(135deg, #eb53ff 0%, #8113ff 100%);
+}
+[data-shell-theme="mm2"] {
+  --shell-accent: #c81414;
+  --shell-accent-soft: rgba(200, 20, 20, 0.12);
+  --shell-gradient: linear-gradient(135deg, #ff3b3b 0%, #a50008 100%);
+}
+[data-shell-theme="gtd"] {
+  --shell-accent: #15803d;
+  --shell-accent-soft: rgba(21, 128, 61, 0.12);
+  --shell-gradient: linear-gradient(135deg, #4ade80 0%, #15803d 100%);
+}
+[data-shell-theme="default"] {
+  --shell-accent: #4f46e5;
+  --shell-accent-soft: rgba(79, 70, 229, 0.12);
+  --shell-gradient: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+}

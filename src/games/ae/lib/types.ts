@@ -1,0 +1,185 @@
+/** Row shapes mirror kirayu-server's ae_accounts/ae_account_details collections. */
+
+export interface CurrencyEntry {
+  Amount: number;
+  DisplayName?: string;
+  Rarity?: string;
+  Icon?: string;
+}
+
+export interface MatchInfo {
+  MapName?: string;
+  ActName?: string;
+  Difficulty?: string;
+  Gamemode?: string;
+  CurrentGameState?: string;
+  Wave?: number;
+  MaxWave?: number;
+  SessionTime?: number;
+}
+
+export interface ActProgress {
+  Name: string;
+  Unlocked?: boolean;
+  Completed?: boolean;
+}
+
+export interface StoryProgress {
+  Locked?: boolean;
+  RequiredLevel?: number;
+  CompletedActs?: number;
+  TotalActs?: number;
+  Percent?: number;
+  NextMap?: string;
+  NextAct?: string;
+  Completed?: boolean;
+  /** Per-act unlock breakdown — only populated for Villain Invasion. */
+  Acts?: ActProgress[] | null;
+}
+
+export interface ProgressInfo {
+  InMatch?: boolean;
+  Match?: MatchInfo | null;
+  CompletedMapsCount?: number;
+  CompletedMaps?: string[];
+  Story?: StoryProgress | null;
+  Raid?: StoryProgress | null;
+  VillainInvasion?: StoryProgress | null;
+}
+
+/** Summon pity counters for one banner (data.BannerData[id].Pity in the tracker payload). */
+export interface BannerPity {
+  Mythic?: number;
+  Legendary?: number;
+  Secret?: number;
+}
+
+/** Light list row — only the columns in ACCOUNT_LIST_COLUMNS are fetched. */
+export interface AccountListRow {
+  user_id: number;
+  username: string;
+  display_name: string | null;
+  level: number | null;
+  exp: number | null;
+  currencies: Record<string, CurrencyEntry>;
+  unit_count: number;
+  item_count: number;
+  in_match: boolean;
+  progress: ProgressInfo;
+  /** Keyed by banner id (e.g. "Standard") — only present once the account has summoned on that banner. */
+  pity: Record<string, BannerPity>;
+  last_seen: string;
+  /** Client-computed from useSecretOwners(), not fetched — whether this account's tracked units include a Shadow/Crow secret. */
+  hasShadow?: boolean;
+  hasCrow?: boolean;
+}
+
+/** Full light row, fetched on the detail page. */
+export interface AccountRow extends AccountListRow {
+  stats: Record<string, unknown>;
+  first_seen: string;
+  updated_at: string;
+}
+
+export interface TraitInfo {
+  Trait?: string;
+  DisplayName?: string;
+  Rarity?: string;
+  Icon?: string;
+  Description?: string;
+}
+
+export interface UnitEntry {
+  UniqueId: string;
+  Asset?: string;
+  DisplayName?: string;
+  Rarity?: string;
+  Element?: string;
+  Archetype?: string;
+  Level?: number;
+  EXP?: number;
+  Equipped?: boolean | number;
+  Worthiness?: number;
+  TotalTakedowns?: number;
+  ObtainedAt?: number;
+  StatPotential?: Record<string, unknown>;
+  Trait?: TraitInfo | null;
+}
+
+export interface InventoryEntry {
+  Amount: number;
+  DisplayName?: string;
+  SubType?: string;
+  Rarity?: string;
+  Icon?: string;
+}
+
+export interface EquipmentStatEntry {
+  Stat?: string;
+  Value?: number;
+}
+
+export interface EquipmentEntry {
+  UniqueId: string;
+  Asset?: string;
+  DisplayName?: string;
+  Rarity?: string;
+  Icon?: string;
+  Stats?: EquipmentStatEntry[];
+}
+
+/** Heavy 1:1 row — lazily fetched only on the detail page. */
+export interface AccountDetailsRow {
+  user_id: number;
+  units: UnitEntry[];
+  inventory: Record<string, InventoryEntry>;
+  equipment: EquipmentEntry[];
+  /** Keyed by banner id (e.g. "Standard") — only present once the account has summoned on that banner. */
+  pity: Record<string, BannerPity>;
+  updated_at: string;
+}
+
+export interface DashboardStats {
+  total: number;
+  online: number;
+  in_match: number;
+  avg_level: number;
+  max_level: number;
+}
+
+export type SortKey = "last_seen" | "level" | "username" | "exp";
+
+export interface AccountFilters {
+  search: string;
+  sort: SortKey;
+  onlineOnly: boolean;
+  inMatchOnly: boolean;
+  /** Owns a Shadow secret unit — see useSecretOwners(). */
+  hasShadow: boolean;
+  /** Owns a Crow secret unit — see useSecretOwners(). */
+  hasCrow: boolean;
+}
+
+/** Column list for the account grid — never SELECT * on the hot path. */
+export const ACCOUNT_LIST_COLUMNS =
+  "user_id,username,display_name,level,exp,currencies,unit_count,item_count,in_match,progress,pity,last_seen";
+
+export const PAGE_SIZE = 30;
+
+/** An account is "online" if the tracker reported within this window. */
+export const ONLINE_WINDOW_MS = 3 * 60 * 1000;
+
+export function isOnline(lastSeen: string): boolean {
+  return Date.now() - new Date(lastSeen).getTime() < ONLINE_WINDOW_MS;
+}
+
+/**
+ * PocketBase stores "date" fields as "YYYY-MM-DD HH:MM:SS.SSSZ" (space, not
+ * "T") and compares filter operands against that literally rather than
+ * re-parsing them — a plain `.toISOString()` cutoff silently matches nothing
+ * (it always sorts after every real value). Use this wherever a date is
+ * bound into a `pb.filter(...)` string.
+ */
+export function pbDateString(date: Date): string {
+  return date.toISOString().replace("T", " ");
+}
