@@ -22,6 +22,13 @@ export default function ProcessedAccountsPage() {
   const { accounts, isLoading } = useProcessedAccounts(version);
   const bump = () => setVersion((v) => v + 1);
 
+  const [swapFilter, setSwapFilter] = useState<string>("all");
+  const swapFilterOptions = Array.from(
+    new Set(accounts.filter((a) => a.swapped).map((a) => `${a.swapped!.trait} ${a.swapped!.secret}`)),
+  ).sort();
+  const filtered =
+    swapFilter === "all" ? accounts : accounts.filter((a) => a.swapped && `${a.swapped.trait} ${a.swapped.secret}` === swapFilter);
+
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
     setSelected((prev) => {
@@ -32,7 +39,7 @@ export default function ProcessedAccountsPage() {
     });
   }
   function toggleSelectAll(): void {
-    setSelected((prev) => (prev.size === accounts.length ? new Set() : new Set(accounts.map((a) => a.user_id))));
+    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((a) => a.user_id))));
   }
   function afterListingClosed(): void {
     setSelected(new Set());
@@ -52,18 +59,34 @@ export default function ProcessedAccountsPage() {
       <div className="max-w-3xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-display text-sm font-semibold">
-            Accounts ({accounts.length}){isLoading && " — loading…"}
+            Accounts ({filtered.length}){isLoading && " — loading…"}
           </h3>
-          {selected.size > 0 && (
-            <MarketplaceListingBar
-              usernames={accounts.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
-              userIds={[...selected]}
-              onDone={afterListingClosed}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            {swapFilterOptions.length > 0 && (
+              <select
+                value={swapFilter}
+                onChange={(e) => setSwapFilter(e.target.value)}
+                className="rounded-lg border border-zinc-200 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-fuchsia-400 dark:border-zinc-700"
+              >
+                <option value="all">All swapped</option>
+                {swapFilterOptions.map((o) => (
+                  <option key={o} value={o}>
+                    {o} only
+                  </option>
+                ))}
+              </select>
+            )}
+            {selected.size > 0 && (
+              <MarketplaceListingBar
+                usernames={filtered.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
+                userIds={[...selected]}
+                onDone={afterListingClosed}
+              />
+            )}
+          </div>
         </div>
 
-        {accounts.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className={hintCls}>
             Nothing here yet — accounts show up once you autoswap one on the Autoswap tab, or list one
             on Eldorado/ZeusX from the Units tab.
@@ -73,13 +96,13 @@ export default function ProcessedAccountsPage() {
             <label className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
               <input
                 type="checkbox"
-                checked={selected.size === accounts.length}
+                checked={selected.size === filtered.length}
                 onChange={toggleSelectAll}
                 className="size-3.5 accent-fuchsia-500"
               />
               Select all
             </label>
-            {accounts.map((acc) => (
+            {filtered.map((acc) => (
               <div
                 key={acc.user_id}
                 className="flex flex-wrap items-center gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
@@ -104,7 +127,7 @@ export default function ProcessedAccountsPage() {
                       title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
                       className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
                     >
-                      Swapped ({acc.swapped.secret})
+                      {acc.swapped.trait} {acc.swapped.secret}
                       <button
                         onClick={() => {
                           clearAutoswapRecord(acc.user_id);

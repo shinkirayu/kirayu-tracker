@@ -32,6 +32,12 @@ function swappableSecrets(match: UnboundAccountMatch): UnboundSecret[] {
   return [...set];
 }
 
+/** Which trait(s) actually triggered the swap, read off the matching entries themselves (not the page's filter) so it's accurate even in "all traits" mode. */
+function traitLabelFor(match: UnboundAccountMatch): string {
+  const traits = new Set(match.entries.filter((e) => e.secret).map((e) => e.trait).filter((t): t is string => !!t));
+  return traits.size > 0 ? [...traits].join(" + ") : "—";
+}
+
 export default function AutoswapPage() {
   const toast = useToast();
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -44,7 +50,13 @@ export default function AutoswapPage() {
   const [runningAll, setRunningAll] = useState(false);
 
   const { accounts: processed } = useProcessedAccounts(historyVersion);
-  const readyToList = processed.filter((a) => a.swapped && !a.listed?.eldorado && !a.listed?.zeusx);
+  const readyToListAll = processed.filter((a) => a.swapped && !a.listed?.eldorado && !a.listed?.zeusx);
+  const [swapFilter, setSwapFilter] = useState<string>("all");
+  const swapFilterOptions = Array.from(
+    new Set(readyToListAll.map((a) => `${a.swapped!.trait} ${a.swapped!.secret}`)),
+  ).sort();
+  const readyToList =
+    swapFilter === "all" ? readyToListAll : readyToListAll.filter((a) => `${a.swapped!.trait} ${a.swapped!.secret}` === swapFilter);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
     setSelected((prev) => {
@@ -109,7 +121,7 @@ export default function AutoswapPage() {
       // pending and NOT be recorded as handled, or a real swap would never
       // get another chance to run.
       if (res.outcome === "swapped" || res.outcome === "moved") {
-        markAutoswapped(match.user_id, label, res.outcome);
+        markAutoswapped(match.user_id, label, traitLabelFor(match), res.outcome);
         setRowStatus((prev) => ({ ...prev, [match.user_id]: "done" }));
         if (res.outcome === "swapped") {
           toast.success(`${match.username} swapped`, res.replacement ? `Replacement: ${res.replacement}` : undefined);
@@ -389,15 +401,31 @@ export default function AutoswapPage() {
       </div>
 
       <div className="max-w-2xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-display text-sm font-semibold">Swapped — ready to list ({readyToList.length})</h3>
-          {selected.size > 0 && (
-            <MarketplaceListingBar
-              usernames={readyToList.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
-              userIds={[...selected]}
-              onDone={afterListingClosed}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            {swapFilterOptions.length > 0 && (
+              <select
+                value={swapFilter}
+                onChange={(e) => setSwapFilter(e.target.value)}
+                className="rounded-lg border border-zinc-200 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-fuchsia-400 dark:border-zinc-700"
+              >
+                <option value="all">All swapped</option>
+                {swapFilterOptions.map((o) => (
+                  <option key={o} value={o}>
+                    {o} only
+                  </option>
+                ))}
+              </select>
+            )}
+            {selected.size > 0 && (
+              <MarketplaceListingBar
+                usernames={readyToList.filter((a) => selected.has(a.user_id)).map((a) => a.username)}
+                userIds={[...selected]}
+                onDone={afterListingClosed}
+              />
+            )}
+          </div>
         </div>
 
         {readyToList.length === 0 ? (
@@ -433,7 +461,7 @@ export default function AutoswapPage() {
                 </span>
                 {acc.swapped && (
                   <span className="shrink-0 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
-                    {acc.swapped.secret}
+                    {acc.swapped.trait} {acc.swapped.secret}
                   </span>
                 )}
               </label>

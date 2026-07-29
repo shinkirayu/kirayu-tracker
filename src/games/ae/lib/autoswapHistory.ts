@@ -14,6 +14,8 @@ export type UnboundLabel = UnboundSecret | "Both";
 
 export interface AutoswapRecord {
   secret: UnboundLabel;
+  /** Which trait triggered the swap (e.g. "Unbound") — whatever trait filter was active on the matching entry at the time. */
+  trait: string;
   outcome: AutoswapOutcome;
   at: string;
 }
@@ -46,9 +48,9 @@ export function isAlreadyAutoswapped(userId: number): boolean {
   return !!getAutoswapRecord(userId);
 }
 
-export function markAutoswapped(userId: number, secret: UnboundLabel, outcome: AutoswapOutcome): void {
+export function markAutoswapped(userId: number, secret: UnboundLabel, trait: string, outcome: AutoswapOutcome): void {
   const all = readAll();
-  all[String(userId)] = { secret, outcome, at: new Date().toISOString() };
+  all[String(userId)] = { secret, trait, outcome, at: new Date().toISOString() };
   writeAll(all);
 }
 
