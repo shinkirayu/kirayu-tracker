@@ -24,10 +24,10 @@ export default function ProcessedAccountsPage() {
 
   const [swapFilter, setSwapFilter] = useState<string>("all");
   const swapFilterOptions = Array.from(
-    new Set(accounts.filter((a) => a.swapped).map((a) => formatAutoswapParts(a.swapped?.parts))),
+    new Set(accounts.filter((a) => a.swapped).map((a) => formatAutoswapParts(a.swapped))),
   ).sort();
   const filtered =
-    swapFilter === "all" ? accounts : accounts.filter((a) => formatAutoswapParts(a.swapped?.parts) === swapFilter);
+    swapFilter === "all" ? accounts : accounts.filter((a) => formatAutoswapParts(a.swapped) === swapFilter);
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   function toggleSelect(userId: number): void {
@@ -127,7 +127,7 @@ export default function ProcessedAccountsPage() {
                       title={`Autoswapped ${timeAgo(acc.swapped.at)} — outcome: ${acc.swapped.outcome}`}
                       className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
                     >
-                      {formatAutoswapParts(acc.swapped.parts)}
+                      {formatAutoswapParts(acc.swapped)}
                       <button
                         onClick={() => {
                           clearAutoswapRecord(acc.user_id);

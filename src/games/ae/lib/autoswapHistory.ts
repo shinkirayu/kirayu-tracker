@@ -23,10 +23,21 @@ export interface AutoswapRecord {
   at: string;
 }
 
-/** "Unbound Crow" / "Unbound Crow + Unbound Shadow" — the exact string shown in badges and used as the filter dropdown's value. */
-export function formatAutoswapParts(parts: AutoswapPart[] | undefined): string {
-  if (!parts || parts.length === 0) return "—";
-  return parts.map((p) => `${p.trait} ${p.secret}`).join(" + ");
+/**
+ * "Unbound Crow" / "Unbound Crow + Unbound Shadow" — the exact string shown
+ * in badges and used as the filter dropdown's value. Records written before
+ * `parts` existed (an older shape had flat `secret`/`trait` fields, and the
+ * one before that had only `secret`) fall back to whatever they actually
+ * have — "Crow" alone is still better than a bare "—".
+ */
+export function formatAutoswapParts(record: AutoswapRecord | undefined | null): string {
+  if (!record) return "—";
+  if (record.parts && record.parts.length > 0) {
+    return record.parts.map((p) => `${p.trait} ${p.secret}`).join(" + ");
+  }
+  const legacy = record as unknown as { secret?: string; trait?: string };
+  if (legacy.secret) return legacy.trait ? `${legacy.trait} ${legacy.secret}` : legacy.secret;
+  return "—";
 }
 
 const STORAGE_KEY = "autoswapHistory";
