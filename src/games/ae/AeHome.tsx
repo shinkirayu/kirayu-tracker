@@ -6,6 +6,7 @@ import UnitsPage from "./pages/UnitsPage";
 import EldoradoPage from "./pages/EldoradoPage";
 import ZeusXPage from "./pages/ZeusXPage";
 import AutoswapPage from "./pages/AutoswapPage";
+import ProcessedAccountsPage from "./pages/ProcessedAccountsPage";
 
 export default function AeHome() {
   return (
@@ -17,6 +18,7 @@ export default function AeHome() {
         <Route path="/eldorado" element={<EldoradoPage />} />
         <Route path="/zeusx" element={<ZeusXPage />} />
         <Route path="/autoswap" element={<AutoswapPage />} />
+        <Route path="/processed" element={<ProcessedAccountsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Routes>
     </EldoradoQueueProvider>

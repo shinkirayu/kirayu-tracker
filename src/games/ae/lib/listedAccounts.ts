@@ -8,7 +8,7 @@
 
 export type Marketplace = "eldorado" | "zeusx";
 
-interface ListedRecord {
+export interface ListedRecord {
   /** ISO timestamp of the last successful publish, per marketplace. */
   eldorado?: string;
   zeusx?: string;
@@ -31,6 +31,11 @@ function writeAll(all: Record<string, ListedRecord>): void {
 
 export function getListedRecord(userId: number): ListedRecord | null {
   return readAll()[String(userId)] ?? null;
+}
+
+/** Every account with a marketplace listing recorded locally, keyed by user_id (as a string, matching the storage key). */
+export function getAllListedRecords(): Record<string, ListedRecord> {
+  return readAll();
 }
 
 export function isAccountListed(userId: number): boolean {

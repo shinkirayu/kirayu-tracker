@@ -90,6 +90,7 @@ const GAME_TABS: Partial<Record<GameId, { to: string; label: string }[]>> = {
     { to: "/ae/eldorado", label: "Eldorado" },
     { to: "/ae/zeusx", label: "ZeusX" },
     { to: "/ae/autoswap", label: "Autoswap" },
+    { to: "/ae/processed", label: "Processed" },
   ],
   mm2: [
     { to: "/mm2", label: "Accounts" },

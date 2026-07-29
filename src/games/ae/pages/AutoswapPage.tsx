@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useToast } from "../../../components/Toast";
-import { useUnboundSecrets, type UnboundAccountMatch } from "../hooks/useUnboundSecrets";
+import {
+  ALL_TRAITS,
+  useUnboundSecrets,
+  type UnboundAccountMatch,
+  type UnboundSecretsFilters,
+} from "../hooks/useUnboundSecrets";
 import {
   autoswapComplete,
   getAccountOpsApiKey,
@@ -9,7 +14,7 @@ import {
   saveAutoswapOptions,
   type AutoswapOptions,
 } from "../lib/accountops";
-import { clearAllAutoswapHistory, markAutoswapped } from "../lib/autoswapHistory";
+import { clearAllAutoswapHistory, markAutoswapped, type UnboundSecret } from "../lib/autoswapHistory";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-200 bg-transparent p-2 text-sm outline-none focus:border-fuchsia-400 dark:border-zinc-700";
@@ -18,10 +23,18 @@ const hintCls = "text-[11px] text-zinc-500 dark:text-zinc-400";
 
 type RowStatus = "idle" | "swapping" | "done" | "not_fired" | "error";
 
+/** Crow/Shadow entries are the only ones with a configured AccountOps rule — everything else (shown only when "all secrets" is on) is informational. */
+function swappableSecrets(match: UnboundAccountMatch): UnboundSecret[] {
+  const set = new Set<UnboundSecret>();
+  for (const e of match.entries) if (e.secret) set.add(e.secret);
+  return [...set];
+}
+
 export default function AutoswapPage() {
   const toast = useToast();
   const [historyVersion, setHistoryVersion] = useState(0);
-  const { matches, isLoading } = useUnboundSecrets(historyVersion);
+  const [filters, setFilters] = useState<UnboundSecretsFilters>({ trait: "Unbound", allSecrets: false });
+  const { matches, availableTraits, isLoading } = useUnboundSecrets(filters, historyVersion);
 
   const [apiKeyInput, setApiKeyInput] = useState(() => getAccountOpsApiKey());
   const [options, setOptions] = useState<AutoswapOptions>(() => getAutoswapOptions());
@@ -32,7 +45,7 @@ export default function AutoswapPage() {
     clearAllAutoswapHistory();
     setRowStatus({});
     setHistoryVersion((v) => v + 1);
-    toast.info("Pending list reset", "Every account currently holding an Unbound Crow/Shadow will show up again.");
+    toast.info("Pending list reset", "Every account currently matching the filters below will show up again.");
   }
 
   function saveSettings(): void {
@@ -46,18 +59,20 @@ export default function AutoswapPage() {
   }
 
   /** Both secrets fire the dedicated "Both" rule (falling back to the Crow rule if that's not set up yet). */
-  function optionFor(match: UnboundAccountMatch): number | null {
-    if (match.secrets.length > 1) return options.both ?? options.crow;
-    return match.secrets[0] === "Crow" ? options.crow : options.shadow;
+  function optionFor(secrets: UnboundSecret[]): number | null {
+    if (secrets.length > 1) return options.both ?? options.crow;
+    return secrets[0] === "Crow" ? options.crow : options.shadow;
   }
 
-  function labelFor(match: UnboundAccountMatch): "Crow" | "Shadow" | "Both" {
-    return match.secrets.length > 1 ? "Both" : match.secrets[0];
+  function labelFor(secrets: UnboundSecret[]): "Crow" | "Shadow" | "Both" {
+    return secrets.length > 1 ? "Both" : secrets[0];
   }
 
   async function swapOne(match: UnboundAccountMatch): Promise<boolean> {
-    const label = labelFor(match);
-    const option = optionFor(match);
+    const secrets = swappableSecrets(match);
+    if (secrets.length === 0) return false; // view-only row, no button to trigger this anyway
+    const label = labelFor(secrets);
+    const option = optionFor(secrets);
     if (!option) {
       toast.error("No rule number set", `Set the AccountOps rule number for Unbound ${label} in Settings first.`);
       return false;
@@ -100,6 +115,7 @@ export default function AutoswapPage() {
     try {
       for (const match of matches) {
         if (rowStatus[match.user_id] === "done") continue;
+        if (swappableSecrets(match).length === 0) continue;
         await swapOne(match);
       }
     } finally {
@@ -110,8 +126,9 @@ export default function AutoswapPage() {
   const pending = matches
     .filter((m) => rowStatus[m.user_id] !== "done")
     // Accounts with both secrets pending float to the top — they're the highest-value ones to act on first.
-    .sort((a, b) => Number(b.secrets.length > 1) - Number(a.secrets.length > 1));
-  const bothCount = pending.filter((m) => m.secrets.length > 1).length;
+    .sort((a, b) => swappableSecrets(b).length - swappableSecrets(a).length);
+  const bothCount = pending.filter((m) => swappableSecrets(m).length > 1).length;
+  const swappableCount = pending.filter((m) => swappableSecrets(m).length > 0).length;
 
   return (
     <div className="space-y-6">
@@ -201,6 +218,41 @@ export default function AutoswapPage() {
       </div>
 
       <div className="max-w-2xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
+        <h3 className="font-display mb-3 text-sm font-semibold">Filters</h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <label className={labelCls}>Trait</label>
+            <select
+              value={filters.trait}
+              onChange={(e) => setFilters((prev) => ({ ...prev, trait: e.target.value }))}
+              className={inputCls}
+            >
+              {availableTraits.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+              <option value={ALL_TRAITS}>All traits</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 pb-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={filters.allSecrets}
+              onChange={(e) => setFilters((prev) => ({ ...prev, allSecrets: e.target.checked }))}
+              className="size-4 accent-fuchsia-500"
+            />
+            Show all Secret-rarity units
+          </label>
+        </div>
+        <p className={`mt-2 ${hintCls}`}>
+          "Show all Secret-rarity units" broadens the list beyond Crow/Shadow to every Secret-rarity
+          unit — useful for browsing, but only Crow/Shadow (highlighted) have a Swap button, since
+          those are the only ones with a configured AccountOps rule.
+        </p>
+      </div>
+
+      <div className="max-w-2xl rounded-xl border border-zinc-200 p-4 dark:border-white/10">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-display text-sm font-semibold">
             Pending ({pending.length}){isLoading && " — loading…"}
@@ -208,18 +260,18 @@ export default function AutoswapPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={resetPending}
-              title="Clear local swap history so every account currently holding an Unbound Crow/Shadow reappears"
+              title="Clear local swap history so every account currently matching the filters reappears"
               className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-fuchsia-400 dark:border-zinc-700 dark:text-zinc-300"
             >
               Reset pending
             </button>
-            {pending.length > 0 && (
+            {swappableCount > 0 && (
               <button
                 onClick={swapAll}
                 disabled={runningAll}
                 className="gradient-purple rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {runningAll ? "Swapping…" : `Swap all (${pending.length})`}
+                {runningAll ? "Swapping…" : `Swap all (${swappableCount})`}
               </button>
             )}
           </div>
@@ -233,12 +285,14 @@ export default function AutoswapPage() {
         )}
 
         {pending.length === 0 ? (
-          <p className={hintCls}>No tracked accounts currently have an Unbound Crow or Unbound Shadow.</p>
+          <p className={hintCls}>No tracked accounts currently match these filters.</p>
         ) : (
           <div className="space-y-2">
             {pending.map((match) => {
               const status = rowStatus[match.user_id] ?? "idle";
-              const isBoth = match.secrets.length > 1;
+              const secrets = swappableSecrets(match);
+              const isBoth = secrets.length > 1;
+              const isSwappable = secrets.length > 0;
               return (
                 <div
                   key={match.user_id}
@@ -257,12 +311,17 @@ export default function AutoswapPage() {
                           ⭐ Both
                         </span>
                       )}
-                      {match.secrets.map((secret) => (
+                      {match.entries.map((entry) => (
                         <span
-                          key={secret}
-                          className="ml-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                          key={`${entry.unitName}|${entry.trait ?? ""}`}
+                          className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            entry.secret
+                              ? "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                              : "bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-zinc-300"
+                          }`}
                         >
-                          Unbound {secret}
+                          {entry.trait ? `${entry.trait} ` : ""}
+                          {entry.unitName}
                         </span>
                       ))}
                       {status === "not_fired" && (
@@ -276,19 +335,23 @@ export default function AutoswapPage() {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => swapOne(match)}
-                      disabled={status === "swapping" || runningAll}
-                      className="shrink-0 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-semibold text-fuchsia-600 transition-colors hover:border-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/40 dark:bg-white/5 dark:text-fuchsia-400"
-                    >
-                      {status === "swapping"
-                        ? "Swapping…"
-                        : status === "error" || status === "not_fired"
-                          ? "Retry"
-                          : isBoth
-                            ? "Swap now (Both)"
-                            : "Swap now"}
-                    </button>
+                    {isSwappable ? (
+                      <button
+                        onClick={() => swapOne(match)}
+                        disabled={status === "swapping" || runningAll}
+                        className="shrink-0 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-semibold text-fuchsia-600 transition-colors hover:border-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/40 dark:bg-white/5 dark:text-fuchsia-400"
+                      >
+                        {status === "swapping"
+                          ? "Swapping…"
+                          : status === "error" || status === "not_fired"
+                            ? "Retry"
+                            : isBoth
+                              ? "Swap now (Both)"
+                              : "Swap now"}
+                      </button>
+                    ) : (
+                      <span className="shrink-0 text-[11px] text-zinc-400 dark:text-zinc-500">View only</span>
+                    )}
                   </div>
                   {status === "not_fired" && (
                     <p className={`mt-1.5 ${hintCls}`}>

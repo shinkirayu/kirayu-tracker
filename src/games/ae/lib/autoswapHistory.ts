@@ -12,7 +12,7 @@ export type UnboundSecret = "Crow" | "Shadow";
 /** "Both" — a distinct autoswap rule/folder for accounts that have both at once, higher-value than either alone. */
 export type UnboundLabel = UnboundSecret | "Both";
 
-interface AutoswapRecord {
+export interface AutoswapRecord {
   secret: UnboundLabel;
   outcome: AutoswapOutcome;
   at: string;
@@ -35,6 +35,11 @@ function writeAll(all: Record<string, AutoswapRecord>): void {
 
 export function getAutoswapRecord(userId: number): AutoswapRecord | null {
   return readAll()[String(userId)] ?? null;
+}
+
+/** Every account with local autoswap history, keyed by user_id (as a string, matching the storage key). */
+export function getAllAutoswapRecords(): Record<string, AutoswapRecord> {
+  return readAll();
 }
 
 export function isAlreadyAutoswapped(userId: number): boolean {
