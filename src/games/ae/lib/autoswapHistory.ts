@@ -9,9 +9,11 @@ import type { AutoswapOutcome } from "./accountops";
  */
 
 export type UnboundSecret = "Crow" | "Shadow";
+/** "Both" — a distinct autoswap rule/folder for accounts that have both at once, higher-value than either alone. */
+export type UnboundLabel = UnboundSecret | "Both";
 
 interface AutoswapRecord {
-  secret: UnboundSecret;
+  secret: UnboundLabel;
   outcome: AutoswapOutcome;
   at: string;
 }
@@ -39,7 +41,7 @@ export function isAlreadyAutoswapped(userId: number): boolean {
   return !!getAutoswapRecord(userId);
 }
 
-export function markAutoswapped(userId: number, secret: UnboundSecret, outcome: AutoswapOutcome): void {
+export function markAutoswapped(userId: number, secret: UnboundLabel, outcome: AutoswapOutcome): void {
   const all = readAll();
   all[String(userId)] = { secret, outcome, at: new Date().toISOString() };
   writeAll(all);
@@ -49,4 +51,9 @@ export function clearAutoswapRecord(userId: number): void {
   const all = readAll();
   delete all[String(userId)];
   writeAll(all);
+}
+
+/** Wipes all local autoswap bookkeeping — every account currently matching Unbound Crow/Shadow reappears as pending. */
+export function clearAllAutoswapHistory(): void {
+  localStorage.removeItem(STORAGE_KEY);
 }

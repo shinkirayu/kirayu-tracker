@@ -15,6 +15,7 @@ const KEYS = {
   apiKey: "accountops.apiKey",
   crowOption: "accountops.crowOption",
   shadowOption: "accountops.shadowOption",
+  bothOption: "accountops.bothOption",
 } as const;
 
 export function getAccountOpsApiKey(): string {
@@ -36,14 +37,18 @@ export interface AutoswapOptions {
   crow: number | null;
   /** Autoswap rule number for the Unbound Shadow output folder. */
   shadow: number | null;
+  /** Autoswap rule number for accounts with BOTH at once — a separate, higher-value output folder. Falls back to the Crow rule if unset. */
+  both: number | null;
 }
 
 export function getAutoswapOptions(): AutoswapOptions {
   const crow = Number(localStorage.getItem(KEYS.crowOption));
   const shadow = Number(localStorage.getItem(KEYS.shadowOption));
+  const both = Number(localStorage.getItem(KEYS.bothOption));
   return {
     crow: Number.isFinite(crow) && crow > 0 ? crow : null,
     shadow: Number.isFinite(shadow) && shadow > 0 ? shadow : null,
+    both: Number.isFinite(both) && both > 0 ? both : null,
   };
 }
 
@@ -52,6 +57,8 @@ export function saveAutoswapOptions(options: AutoswapOptions): void {
   else localStorage.removeItem(KEYS.crowOption);
   if (options.shadow != null) localStorage.setItem(KEYS.shadowOption, String(options.shadow));
   else localStorage.removeItem(KEYS.shadowOption);
+  if (options.both != null) localStorage.setItem(KEYS.bothOption, String(options.both));
+  else localStorage.removeItem(KEYS.bothOption);
 }
 
 interface ProxyOptions {

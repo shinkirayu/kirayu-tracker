@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../../components/Toast";
-import { useUnboundSecrets, type UnboundSecretMatch } from "../hooks/useUnboundSecrets";
+import { useUnboundSecrets, type UnboundAccountMatch } from "../hooks/useUnboundSecrets";
 import {
   autoswapComplete,
   getAccountOpsApiKey,
@@ -9,7 +9,7 @@ import {
   saveAutoswapOptions,
   type AutoswapOptions,
 } from "../lib/accountops";
-import { markAutoswapped } from "../lib/autoswapHistory";
+import { clearAllAutoswapHistory, markAutoswapped } from "../lib/autoswapHistory";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-200 bg-transparent p-2 text-sm outline-none focus:border-fuchsia-400 dark:border-zinc-700";
@@ -20,12 +20,20 @@ type RowStatus = "idle" | "swapping" | "done" | "not_fired" | "error";
 
 export default function AutoswapPage() {
   const toast = useToast();
-  const { matches, isLoading } = useUnboundSecrets();
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const { matches, isLoading } = useUnboundSecrets(historyVersion);
 
   const [apiKeyInput, setApiKeyInput] = useState(() => getAccountOpsApiKey());
   const [options, setOptions] = useState<AutoswapOptions>(() => getAutoswapOptions());
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({});
   const [runningAll, setRunningAll] = useState(false);
+
+  function resetPending(): void {
+    clearAllAutoswapHistory();
+    setRowStatus({});
+    setHistoryVersion((v) => v + 1);
+    toast.info("Pending list reset", "Every account currently holding an Unbound Crow/Shadow will show up again.");
+  }
 
   function saveSettings(): void {
     try {
@@ -37,17 +45,21 @@ export default function AutoswapPage() {
     }
   }
 
-  function optionFor(secret: UnboundSecretMatch["secret"]): number | null {
-    return secret === "Crow" ? options.crow : options.shadow;
+  /** Both secrets fire the dedicated "Both" rule (falling back to the Crow rule if that's not set up yet). */
+  function optionFor(match: UnboundAccountMatch): number | null {
+    if (match.secrets.length > 1) return options.both ?? options.crow;
+    return match.secrets[0] === "Crow" ? options.crow : options.shadow;
   }
 
-  async function swapOne(match: UnboundSecretMatch): Promise<boolean> {
-    const option = optionFor(match.secret);
+  function labelFor(match: UnboundAccountMatch): "Crow" | "Shadow" | "Both" {
+    return match.secrets.length > 1 ? "Both" : match.secrets[0];
+  }
+
+  async function swapOne(match: UnboundAccountMatch): Promise<boolean> {
+    const label = labelFor(match);
+    const option = optionFor(match);
     if (!option) {
-      toast.error(
-        "No rule number set",
-        `Set the AccountOps rule number for Unbound ${match.secret} in Settings first.`,
-      );
+      toast.error("No rule number set", `Set the AccountOps rule number for Unbound ${label} in Settings first.`);
       return false;
     }
 
@@ -61,7 +73,7 @@ export default function AutoswapPage() {
       // pending and NOT be recorded as handled, or a real swap would never
       // get another chance to run.
       if (res.outcome === "swapped" || res.outcome === "moved") {
-        markAutoswapped(match.user_id, match.secret, res.outcome);
+        markAutoswapped(match.user_id, label, res.outcome);
         setRowStatus((prev) => ({ ...prev, [match.user_id]: "done" }));
         if (res.outcome === "swapped") {
           toast.success(`${match.username} swapped`, res.replacement ? `Replacement: ${res.replacement}` : undefined);
@@ -95,7 +107,11 @@ export default function AutoswapPage() {
     }
   }
 
-  const pending = matches.filter((m) => rowStatus[m.user_id] !== "done");
+  const pending = matches
+    .filter((m) => rowStatus[m.user_id] !== "done")
+    // Accounts with both secrets pending float to the top — they're the highest-value ones to act on first.
+    .sort((a, b) => Number(b.secrets.length > 1) - Number(a.secrets.length > 1));
+  const bothCount = pending.filter((m) => m.secrets.length > 1).length;
 
   return (
     <div className="space-y-6">
@@ -127,7 +143,7 @@ export default function AutoswapPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <label className={labelCls}>Unbound Crow rule #</label>
               <input
@@ -154,10 +170,25 @@ export default function AutoswapPage() {
                 className={inputCls}
               />
             </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>Both (Crow + Shadow) rule #</label>
+              <input
+                type="number"
+                min={1}
+                value={options.both ?? ""}
+                onChange={(e) =>
+                  setOptions((prev) => ({ ...prev, both: e.target.value ? Number(e.target.value) : null }))
+                }
+                placeholder="e.g. 3"
+                className={inputCls}
+              />
+            </div>
           </div>
           <p className={hintCls}>
-            These match the rule numbers on AccountOps' own Settings → Autoswap page (1 = first rule,
-            2 = second, ...) — the output folders for Unbound Crow/Shadow need to exist there first.
+            These match the rule numbers on AccountOps' own Autoswap page (1 = first rule, 2 = second,
+            ...). Create a third rule there for accounts that roll both at once — its own output folder,
+            separate from the Crow-only/Shadow-only ones. If you leave "Both" blank, those accounts fire
+            the Crow rule instead.
           </p>
 
           <button
@@ -174,16 +205,32 @@ export default function AutoswapPage() {
           <h3 className="font-display text-sm font-semibold">
             Pending ({pending.length}){isLoading && " — loading…"}
           </h3>
-          {pending.length > 0 && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={swapAll}
-              disabled={runningAll}
-              className="gradient-purple rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={resetPending}
+              title="Clear local swap history so every account currently holding an Unbound Crow/Shadow reappears"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-fuchsia-400 dark:border-zinc-700 dark:text-zinc-300"
             >
-              {runningAll ? "Swapping…" : `Swap all (${pending.length})`}
+              Reset pending
             </button>
-          )}
+            {pending.length > 0 && (
+              <button
+                onClick={swapAll}
+                disabled={runningAll}
+                className="gradient-purple rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {runningAll ? "Swapping…" : `Swap all (${pending.length})`}
+              </button>
+            )}
+          </div>
         </div>
+
+        {bothCount > 0 && (
+          <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+            ⭐ {bothCount} account{bothCount === 1 ? "" : "s"} {bothCount === 1 ? "has" : "have"} both an Unbound
+            Crow and an Unbound Shadow right now — listed first below, firing the "Both" rule.
+          </p>
+        )}
 
         {pending.length === 0 ? (
           <p className={hintCls}>No tracked accounts currently have an Unbound Crow or Unbound Shadow.</p>
@@ -191,18 +238,33 @@ export default function AutoswapPage() {
           <div className="space-y-2">
             {pending.map((match) => {
               const status = rowStatus[match.user_id] ?? "idle";
+              const isBoth = match.secrets.length > 1;
               return (
                 <div
-                  key={`${match.user_id}-${match.secret}`}
-                  className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-white/5 dark:bg-white/[0.04]"
+                  key={match.user_id}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    isBoth
+                      ? "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10"
+                      : "border-zinc-200 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.04]"
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <span className="font-medium">{match.display_name || match.username}</span>{" "}
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">@{match.username}</span>
-                      <span className="ml-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
-                        Unbound {match.secret}
-                      </span>
+                      {isBoth && (
+                        <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/25 dark:text-amber-300">
+                          ⭐ Both
+                        </span>
+                      )}
+                      {match.secrets.map((secret) => (
+                        <span
+                          key={secret}
+                          className="ml-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-400"
+                        >
+                          Unbound {secret}
+                        </span>
+                      ))}
                       {status === "not_fired" && (
                         <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
                           Not fired
@@ -223,7 +285,9 @@ export default function AutoswapPage() {
                         ? "Swapping…"
                         : status === "error" || status === "not_fired"
                           ? "Retry"
-                          : "Swap now"}
+                          : isBoth
+                            ? "Swap now (Both)"
+                            : "Swap now"}
                     </button>
                   </div>
                   {status === "not_fired" && (
