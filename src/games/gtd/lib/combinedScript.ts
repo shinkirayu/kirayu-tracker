@@ -842,17 +842,44 @@ local function clickGui(button)
 	if not button then
 		return
 	end
-	pcall(firesignal, button.Activated)
-	pcall(firesignal, button.MouseButton1Click)
-	pcall(firesignal, button.MouseButton1Down)
-	pcall(firesignal, button.MouseButton1Up)
+	-- firesignal(button.Activated) is intentionally not used here: buttons
+	-- whose handler yields (e.g. makes a server round trip, like the trade
+	-- "Add" button) throw "ButtonBindError - attempt to yield across
+	-- metamethod/C-call boundary" from the game's own UI framework when
+	-- fired that way, aborting the click before it completes. A real
+	-- VirtualInputManager click goes through the normal engine input
+	-- pipeline instead, so the handler yields normally.
 	local ok, VirtualInputManager = pcall(game.GetService, game, "VirtualInputManager")
 	if ok and VirtualInputManager then
 		pcall(function()
-			local center = button.AbsolutePosition + button.AbsoluteSize / 2
+			-- AbsolutePosition excludes the topbar GuiInset, but
+			-- SendMouseButtonEvent expects true screen coordinates - without
+			-- adding the inset, every click here lands off-target.
+			local inset = GuiService:GetGuiInset()
+			local center = button.AbsolutePosition + button.AbsoluteSize / 2 + inset
 			VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
 			VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
 		end)
+	end
+end
+
+-- Scrolls a child into the ScrollingFrame's visible viewport before it's
+-- clicked. ScrollingFrame clips descendants outside the viewport, and that
+-- clip also blocks input hit-testing, not just rendering - so a
+-- VirtualInputManager click computed from AbsolutePosition lands on nothing
+-- if the item is currently scrolled out of view (observed: inventory units
+-- only got added once manually scrolled into sight first).
+local function ScrollIntoView(scrollingFrame, child)
+	local framePos = scrollingFrame.AbsolutePosition
+	local frameSize = scrollingFrame.AbsoluteSize
+	local relY = child.AbsolutePosition.Y - framePos.Y
+
+	if relY < 0 then
+		scrollingFrame.CanvasPosition = Vector2.new(scrollingFrame.CanvasPosition.X, scrollingFrame.CanvasPosition.Y + relY - 10)
+		task.wait(0.1)
+	elseif relY + child.AbsoluteSize.Y > frameSize.Y then
+		scrollingFrame.CanvasPosition = Vector2.new(scrollingFrame.CanvasPosition.X, scrollingFrame.CanvasPosition.Y + (relY + child.AbsoluteSize.Y - frameSize.Y) + 10)
+		task.wait(0.1)
 	end
 end
 
@@ -2333,7 +2360,12 @@ local function joinTargetServer()
 end
 
 -- The "Amount" field is a TextLabel, not typable - the only way to set
--- quantity is dragging the slider via VirtualInputManager.
+-- quantity is dragging the slider via VirtualInputManager. The slider's
+-- exact pixel-to-value quantization (deadzones, rounding) isn't reliable to
+-- precompute - live testing showed dragging to the container's own visual
+-- right edge undershoots (lands one step short of max), so after an initial
+-- estimate this nudges the drag and re-reads the Amount label until it
+-- matches, instead of trusting a single precomputed target position.
 local function setTradeAmount(picker, desiredAmount)
 	local sliderBar = picker:FindFirstChild("SliderContainer")
 	if not sliderBar then
@@ -2354,29 +2386,48 @@ local function setTradeAmount(picker, desiredAmount)
 		return false
 	end
 
-	local maxVal = tonumber(maxValLabel and maxValLabel.Text) or desiredAmount
-	local clamped = math.max(1, math.min(desiredAmount, maxVal))
-	local inset = GuiService:GetGuiInset()
-
-	local startX = dragCircle.AbsolutePosition.X + (dragCircle.AbsoluteSize.X / 2) + inset.X
-	local startY = dragCircle.AbsolutePosition.Y + (dragCircle.AbsoluteSize.Y / 2) + inset.Y
-	local fullEndX = sliderBar.AbsolutePosition.X + sliderBar.AbsoluteSize.X + inset.X - 10
-	local targetX = startX + (fullEndX - startX) * (maxVal > 0 and (clamped / maxVal) or 1)
-
 	local ok, VIM = pcall(game.GetService, game, "VirtualInputManager")
 	if not ok then
 		return false
 	end
 
-	VIM:SendMouseMoveEvent(startX, startY, game)
-	task.wait(0.05)
-	VIM:SendMouseButtonEvent(startX, startY, 0, true, game, 0)
-	task.wait(0.05)
-	for i = 1, 6 do
-		VIM:SendMouseMoveEvent(startX + (targetX - startX) * (i / 6), startY, game)
-		task.wait(0.02)
+	local maxVal = tonumber(maxValLabel and maxValLabel.Text) or desiredAmount
+	local clamped = math.max(1, math.min(desiredAmount, maxVal))
+	local inset = GuiService:GetGuiInset()
+
+	local leftX = sliderBar.AbsolutePosition.X + inset.X
+	local rightX = sliderBar.AbsolutePosition.X + sliderBar.AbsoluteSize.X + inset.X
+	local dragY = dragCircle.AbsolutePosition.Y + (dragCircle.AbsoluteSize.Y / 2) + inset.Y
+
+	local function dragTo(targetX)
+		local startX = dragCircle.AbsolutePosition.X + (dragCircle.AbsoluteSize.X / 2) + inset.X
+		VIM:SendMouseMoveEvent(startX, dragY, game)
+		task.wait(0.05)
+		VIM:SendMouseButtonEvent(startX, dragY, 0, true, game, 0)
+		task.wait(0.05)
+		for i = 1, 6 do
+			VIM:SendMouseMoveEvent(startX + (targetX - startX) * (i / 6), dragY, game)
+			task.wait(0.02)
+		end
+		VIM:SendMouseButtonEvent(targetX, dragY, 0, false, game, 0)
 	end
-	VIM:SendMouseButtonEvent(targetX, startY, 0, false, game, 0)
+
+	-- 1-indexed slider: value 1 sits at the left edge, not value 0.
+	local targetX = leftX + (rightX - leftX) * ((clamped - 1) / math.max(1, maxVal - 1))
+	for _ = 1, 6 do
+		dragTo(targetX)
+		task.wait(0.1)
+		local current = tonumber(picker.Amount.Text)
+		if current == clamped then
+			break
+		end
+		if not current then
+			break
+		end
+		local perStep = (rightX - leftX) / math.max(1, maxVal - 1)
+		targetX = math.clamp(targetX + perStep * (clamped - current), leftX - perStep, rightX + perStep)
+	end
+
 	return true, clamped
 end
 
@@ -2434,6 +2485,12 @@ local function runTradeLoop()
 				if termsUI and termsUI.Visible then
 					clickGui(termsUI.Items.Buttons.Items:FindFirstChild("Accept"))
 					task.wait(0.5)
+					-- Accepting terms (first trade with this partner this
+					-- server session) can rebuild the trade window, so
+					-- moreBtn/tradeGui captured above may now be stale -
+					-- let the next pass re-fetch everything fresh instead
+					-- of continuing to add items with pre-accept references.
+					return
 				end
 
 				if moreBtn and moreBtn.Visible and #TradeConfig.TradeItems > 0 then
@@ -2442,11 +2499,15 @@ local function runTradeLoop()
 					for _, item in ipairs(TradeConfig.TradeItems) do
 						if not moreBtn.Visible then break end
 						if not giveSf:FindFirstChild(item.unit_id) then
-							clickGui(moreBtn)
+							clickGui(moreBtn:FindFirstChild("TextButton"))
 							task.wait(1.2)
+							if not tradeGui.Inventory.Visible then
+								warn("[Kirayu Headless] Trade: Inventory picker never opened after clicking more for " .. item.unit_id .. ".")
+							end
 							local child = tradeGui.Inventory.Inventory.Frame.Items.Items.ScrollingFrame:FindFirstChild(item.unit_id)
 							local btn = child and child:FindFirstChild("TextButton")
 							if btn then
+								ScrollIntoView(tradeGui.Inventory.Inventory.Frame.Items.Items.ScrollingFrame, child)
 								clickGui(btn)
 								task.wait(0.3)
 								if tradeGui.AmountAdd.Visible then
@@ -2474,7 +2535,16 @@ local function runTradeLoop()
 									repeat
 										task.wait(0.1)
 									until not tradeGui.AmountAdd.Visible
+									-- Adding an item reflows the Give list's
+									-- UIGridLayout (shifting unit_more to a
+									-- new cell) - give it a moment to settle
+									-- before clicking again for the next item.
+									task.wait(0.5)
+								else
+									warn("[Kirayu Headless] Trade: AmountAdd never opened after clicking " .. item.unit_id .. " in inventory (inventory closed=" .. tostring(not tradeGui.Inventory.Visible) .. ").")
 								end
+							else
+								warn("[Kirayu Headless] Trade: " .. item.unit_id .. " not found in inventory picker (inventory visible=" .. tostring(tradeGui.Inventory.Visible) .. ", child found=" .. tostring(child ~= nil) .. ").")
 							end
 						end
 					end
@@ -2804,8 +2874,16 @@ end
 -- reason (per-unit SeedsBuyLimit/ForceBuyLimit reached - which varies unit to
 -- unit and can double for Robux spenders/Premium - out of stock, can't
 -- afford, or rotated out of circulation). No hardcoded limit number needed;
--- the same check is reused by the always-on lobby shop buyer below.
-local MaxedUnits = {}
+-- the same check is reused by the always-on lobby shop buyer below. Only a
+-- definitive ok-and-not-success response marks a unit maxed - a failed
+-- pcall (transport/executor error) is left unmarked so it's retried next
+-- pass, and the whole table is periodically reset so a run of transient
+-- failures (e.g. temporarily low on seeds) doesn't permanently disable
+-- buying for the rest of the session. The reset timestamp is stashed under
+-- a boolean true key in the same table (never collides with a real unit id
+-- string) instead of a separate top-level local, since this script is one
+-- flat chunk and Luau caps top-level locals at 200.
+local MaxedUnits = { [true] = os.clock() }
 
 local function StartBuyLoop()
 	if RunningBuy or #SummonConfig.BuyUnits == 0 then
@@ -2816,6 +2894,9 @@ local function StartBuyLoop()
 
 	task.spawn(function()
 		while RunningBuy do
+			if os.clock() - MaxedUnits[true] > 300 then
+				MaxedUnits = { [true] = os.clock() }
+			end
 			for _, id in ipairs(SummonConfig.BuyUnits) do
 				if not RunningBuy then
 					break
@@ -2828,7 +2909,7 @@ local function StartBuyLoop()
 					else
 						ok, success = pcall(RF_BuyUnitWithSeeds.InvokeServer, RF_BuyUnitWithSeeds, id)
 					end
-					if not (ok and success) then
+					if ok and not success then
 						MaxedUnits[id] = true
 					end
 					task.wait(0.4)
@@ -2851,33 +2932,82 @@ local function StartBuyLoop()
 	end)
 end
 
+-- Applies every field from the remote config record to SummonConfig before
+-- any loop is started/stopped/restarted, so a first-time enable (loop_summon
+-- flipping on together with a new box/amount/threshold in the same save)
+-- never starts a loop against stale/default values, then reconciles
+-- start/stop/restart decisions using the now-fully-applied SummonConfig. A
+-- box/amount/threshold change while the summon loop is already running
+-- triggers a stop+restart (rather than a live re-read) so the loop re-runs
+-- StartSummonLoop's box lookup and ban push for the new box. The apply/
+-- reconcile split is kept as functions local to ApplySummonConfig (not
+-- top-level) since this script is one flat chunk and Luau caps top-level
+-- locals at 200.
 local function ApplySummonConfig(remote)
 	if not remote then
 		return
 	end
 
-	local newLoopSummon = remote.loop_summon == true
-	if newLoopSummon ~= SummonConfig.LoopSummon then
-		SummonConfig.LoopSummon = newLoopSummon
-		if newLoopSummon then
-			StartSummonLoop()
-		else
-			StopSummonLoop()
+	local function applySettings()
+		local flags = {
+			loopSummonChanged = false,
+			boxOrParamsChanged = false,
+			bansChanged = false,
+			autoBuyChanged = false,
+			buyUnitsChanged = false,
+		}
+
+		local newLoopSummon = remote.loop_summon == true
+		if newLoopSummon ~= SummonConfig.LoopSummon then
+			SummonConfig.LoopSummon = newLoopSummon
+			flags.loopSummonChanged = true
 		end
+
+		if remote.summon_box and remote.summon_box ~= SummonConfig.SummonBox then
+			SummonConfig.SummonBox = remote.summon_box
+			flags.boxOrParamsChanged = true
+		end
+		if remote.summon_amount and remote.summon_amount ~= SummonConfig.SummonAmount then
+			SummonConfig.SummonAmount = remote.summon_amount
+			flags.boxOrParamsChanged = true
+		end
+		if remote.stop_summon_at ~= nil and remote.stop_summon_at ~= SummonConfig.StopSummonAt then
+			SummonConfig.StopSummonAt = remote.stop_summon_at
+			flags.boxOrParamsChanged = true
+		end
+		if type(remote.banned_units) == "table" and not SetsEqual(remote.banned_units, SummonConfig.BannedUnits) then
+			SummonConfig.BannedUnits = remote.banned_units
+			flags.bansChanged = true
+		end
+
+		if remote.auto_buy ~= nil then
+			local newAutoBuy = remote.auto_buy == true
+			if newAutoBuy ~= SummonConfig.AutoBuy then
+				SummonConfig.AutoBuy = newAutoBuy
+				flags.autoBuyChanged = true
+			end
+		end
+		if type(remote.buy_units) == "table" and not SetsEqual(remote.buy_units, SummonConfig.BuyUnits) then
+			SummonConfig.BuyUnits = remote.buy_units
+			flags.buyUnitsChanged = true
+		end
+
+		return flags
 	end
 
-	if remote.summon_box and remote.summon_box ~= SummonConfig.SummonBox then
-		SummonConfig.SummonBox = remote.summon_box
-	end
-	if remote.summon_amount then
-		SummonConfig.SummonAmount = remote.summon_amount
-	end
-	if remote.stop_summon_at ~= nil then
-		SummonConfig.StopSummonAt = remote.stop_summon_at
-	end
-	if type(remote.banned_units) == "table" and not SetsEqual(remote.banned_units, SummonConfig.BannedUnits) then
-		SummonConfig.BannedUnits = remote.banned_units
-		if RunningSummon then
+	local function reconcile(flags)
+		if flags.loopSummonChanged then
+			if SummonConfig.LoopSummon then
+				StartSummonLoop()
+			else
+				StopSummonLoop()
+			end
+		elseif RunningSummon and SummonConfig.LoopSummon and flags.boxOrParamsChanged then
+			StopSummonLoop()
+			StartSummonLoop()
+		end
+
+		if flags.bansChanged and RunningSummon then
 			local data = BoxData[SummonConfig.SummonBox]
 			if data then
 				for _, id in ipairs(SummonConfig.BannedUnits) do
@@ -2885,22 +3015,21 @@ local function ApplySummonConfig(remote)
 				end
 			end
 		end
-	end
 
-	if remote.auto_buy ~= nil then
-		local newAutoBuy = remote.auto_buy == true
-		if newAutoBuy ~= SummonConfig.AutoBuy then
-			SummonConfig.AutoBuy = newAutoBuy
-			if newAutoBuy then
+		if flags.buyUnitsChanged then
+			MaxedUnits = { [true] = os.clock() }
+		end
+
+		if flags.autoBuyChanged then
+			if SummonConfig.AutoBuy then
 				StartBuyLoop()
 			else
 				RunningBuy = false
 			end
 		end
 	end
-	if type(remote.buy_units) == "table" and not SetsEqual(remote.buy_units, SummonConfig.BuyUnits) then
-		SummonConfig.BuyUnits = remote.buy_units
-	end
+
+	reconcile(applySettings())
 end
 
 -- ===== Lobby permanent-shop auto-buyer (ported from lobby_shop_buyer.lua) =====
@@ -2929,7 +3058,7 @@ local function scrapeLimitedShopUnits()
 	return found
 end
 
-local shopBuyerExhausted = {}
+local shopBuyerExhausted = { [true] = os.clock() }
 
 local function tryBuyLimitedUnitUntilLimit(unit)
 	if shopBuyerExhausted[unit.id] then
@@ -2940,7 +3069,11 @@ local function tryBuyLimitedUnitUntilLimit(unit)
 			return
 		end
 		local ok, success = pcall(RF_BuyUnitWithSeeds.InvokeServer, RF_BuyUnitWithSeeds, unit.id)
-		if not (ok and success) then
+		if not ok then
+			-- transport/executor error: leave unmarked, retry next pass
+			return
+		end
+		if not success then
 			shopBuyerExhausted[unit.id] = true
 			return
 		end
@@ -2951,6 +3084,9 @@ end
 
 task.spawn(function()
 	while true do
+		if os.clock() - shopBuyerExhausted[true] > 300 then
+			shopBuyerExhausted = { [true] = os.clock() }
+		end
 		local ok, err = pcall(function()
 			if not isInActiveMatch() then
 				for _, unit in ipairs(scrapeLimitedShopUnits()) do
