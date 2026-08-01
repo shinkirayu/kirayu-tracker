@@ -317,6 +317,7 @@
   background: rgba(79,195,255,0.12); border: 1px solid rgba(79,195,255,0.3); color: var(--blue); cursor: pointer;
 }
 .gtd-theme .chip.violet { background: rgba(170,85,255,0.12); border-color: rgba(170,85,255,0.3); color: #c98bff; }
+.gtd-theme .chip.green { background: rgba(126,211,33,0.14); border-color: var(--green-dark); color: var(--green); }
 .gtd-theme .chip .remove { opacity: 0.6; }
 .gtd-theme .chip:hover .remove { opacity: 1; }
 

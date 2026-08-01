@@ -51,6 +51,7 @@ export interface SummonConfig {
   trade_target: string;
   trade_target_job_id: string;
   trade_items: TradeItem[];
+  rejoin_requested_at?: number;
 }
 
 export type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "godly" | "exclusive";

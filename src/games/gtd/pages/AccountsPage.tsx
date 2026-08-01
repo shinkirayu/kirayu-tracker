@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useGtdAccounts, realAccounts } from "../hooks/useGtdAccounts";
+import { useSaveSummonConfig } from "../hooks/useSummonConfigs";
 import { useSeedsBaseline } from "../hooks/useSeedsBaseline";
 import { formatAge, formatNumber, formatSigned, isOnline } from "../lib/format";
 import { StatChip } from "../components/StatChip";
@@ -54,8 +55,13 @@ function MapCell({ acc, online }: { acc: GtdAccount; online: boolean }) {
 export default function AccountsPage() {
   const { data, isLoading } = useGtdAccounts();
   const baseline = useSeedsBaseline(data);
+  const save = useSaveSummonConfig();
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
   const [search, setSearch] = useState("");
+
+  function rejoin(username: string) {
+    save.mutate({ username, patch: { rejoin_requested_at: Date.now() } });
+  }
 
   const real = useMemo(() => realAccounts(data ?? []), [data]);
 
@@ -71,6 +77,11 @@ export default function AccountsPage() {
   }, [real, filter, search]);
 
   const online = useMemo(() => real.filter(isOnline), [real]);
+
+  function rejoinAll() {
+    online.forEach((a) => rejoin(a.username));
+  }
+
   const totalSeeds = real.reduce((sum, a) => sum + (a.seeds || 0), 0);
   const totalSeedsToday = real.reduce((sum, a) => {
     const has = Object.prototype.hasOwnProperty.call(baseline, a.username);
@@ -111,19 +122,28 @@ export default function AccountsPage() {
               </button>
             ))}
           </div>
+          <button
+            className="pill blue"
+            onClick={rejoinAll}
+            disabled={save.isPending || online.length === 0}
+            title="Send every online account back into the lobby/queue"
+          >
+            🔄 Rejoin All
+          </button>
         </div>
 
         <div className="panel table-wrap">
           <table className="grid-table">
             <colgroup>
-              <col style={{ width: "19%" }} />
-              <col style={{ width: "11%" }} />
-              <col style={{ width: "11%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "15%" }} />
-              <col style={{ width: "14%" }} />
+              <col style={{ width: "17%" }} />
               <col style={{ width: "10%" }} />
-              <col style={{ width: "7%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "6%" }} />
+              <col style={{ width: "10%" }} />
             </colgroup>
             <thead>
               <tr>
@@ -135,18 +155,19 @@ export default function AccountsPage() {
                 <th title="Rafflesia &amp; Tridenthra (Godly-tier)">Key Items</th>
                 <th>Status</th>
                 <th>Last Seen</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="loading-state">
+                  <td colSpan={9} className="loading-state">
                     <span className="big-emoji">🌱</span>Loading farm accounts...
                   </td>
                 </tr>
               ) : list.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="empty-state">
+                  <td colSpan={9} className="empty-state">
                     <span className="big-emoji">🔍</span>No accounts match.
                   </td>
                 </tr>
@@ -187,6 +208,16 @@ export default function AccountsPage() {
                         <ActionCell acc={acc} online={on} />
                       </td>
                       <td className="heartbeat">{formatAge(acc)}</td>
+                      <td>
+                        <button
+                          className="pill blue"
+                          disabled={!on || save.isPending}
+                          title="Send this account back into the lobby/queue"
+                          onClick={() => rejoin(acc.username)}
+                        >
+                          🔄
+                        </button>
+                      </td>
                     </tr>
                   );
                 })

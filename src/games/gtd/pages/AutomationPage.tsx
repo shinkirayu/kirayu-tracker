@@ -5,7 +5,7 @@ import { useSummonConfigs, useSaveSummonConfig } from "../hooks/useSummonConfigs
 import { useShopUnits } from "../hooks/useShopUnits";
 import { SUMMON_BOXES, SUMMON_BOX_MAP } from "../data/summonBoxes";
 import { unitRarity } from "../lib/unitRarity";
-import { formatNumber, isOnline, prettifyUnitId } from "../lib/format";
+import { formatAge, formatNumber, isOnline, prettifyUnitId } from "../lib/format";
 import { UnitCardMini } from "../components/UnitCardMini";
 import type { GtdAccount, SummonConfig, TradeItem } from "../lib/types";
 
@@ -13,6 +13,51 @@ const DEFAULT_BOX = "Greenhouse Summon";
 
 function isParked(acc: GtdAccount | undefined | null): boolean {
   return !!(acc && acc.parked_job_id && isOnline(acc));
+}
+
+/**
+ * Classifies the account's live `action` text (as pushed by the bot's
+ * pushHudLog every ~15s) into a colored category chip + the raw detail text,
+ * so the Logs panel below answers "is it actually summoning/buying/trading"
+ * at a glance instead of just showing an opaque string.
+ */
+function ActivityCell({ acc, online }: { acc: GtdAccount; online: boolean }) {
+  if (!online) return <span className="action-text offline">Offline</span>;
+
+  const action = acc.action || "";
+  const a = action.toLowerCase();
+  let chipClass = "";
+  let label = "";
+  if (a.includes("summon")) {
+    chipClass = "chip green";
+    label = "Summon";
+  } else if (a.includes("buy") || a.includes("bought")) {
+    chipClass = "chip";
+    label = "Buy";
+  } else if (a.includes("trad")) {
+    chipClass = "chip violet";
+    label = "Trade";
+  } else if (a.includes("rejoin") || a.includes("leaving match")) {
+    chipClass = "chip";
+    label = "Rejoin";
+  } else if (a.includes("victory") || a.includes("defeat") || a.includes("restart") || a.includes("match")) {
+    label = "Match";
+  } else if (a.includes("joining") || a.includes("hosted") || a.includes("hop")) {
+    label = "Join";
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {chipClass && (
+        <span className={chipClass} style={{ cursor: "default" }}>
+          {label}
+        </span>
+      )}
+      <span className="action-text" title={action}>
+        {action || "Idle"}
+      </span>
+    </div>
+  );
 }
 
 function ownedUnits(acc: GtdAccount | undefined) {
@@ -555,6 +600,55 @@ export default function AutomationPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 20 }}>
+        <div className="holders-meta-label" style={{ padding: "14px 18px 0" }}>
+          Live Activity Log
+        </div>
+        <div className="table-wrap">
+          <table className="grid-table">
+            <colgroup>
+              <col style={{ width: "20%" }} />
+              <col style={{ width: "65%" }} />
+              <col style={{ width: "15%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="left">Account</th>
+                <th className="left">Activity</th>
+                <th>Last Seen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountList.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="empty-state">
+                    <span className="big-emoji">📜</span>No accounts match.
+                  </td>
+                </tr>
+              ) : (
+                accountList.map((a) => {
+                  const on = isOnline(a);
+                  return (
+                    <tr key={a.id} className={on ? "" : "offline-row"}>
+                      <td className="left">
+                        <div className="user-cell">
+                          <span className={`status-dot ${on ? "" : "offline"}`} />
+                          <span className="name">{a.username}</span>
+                        </div>
+                      </td>
+                      <td className="left">
+                        <ActivityCell acc={a} online={on} />
+                      </td>
+                      <td className="heartbeat">{formatAge(a)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
