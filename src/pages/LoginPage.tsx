@@ -1,16 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { pb, GAMES, setEnabledGames, type GameId } from "../lib/pocketbase";
-
-const ALL_GAMES = Object.keys(GAMES) as GameId[];
+import { pb } from "../lib/pocketbase";
 
 /**
  * Sign-in + self-serve sign-up against the one shared `users` collection.
  * Safe to open up because every game's data is owner-scoped by API rules
  * (owner = @request.auth.id) — a freshly signed-up user just starts with
  * zero tracked accounts.
- *
- * Signup enables every game by default (toggle any off later in Settings) —
- * there's no separate game-picker step here.
  */
 export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -33,7 +28,6 @@ export default function LoginPage() {
       } else {
         await pb.collection("users").create({ email, password, passwordConfirm: password });
         await pb.collection("users").authWithPassword(email, password);
-        await setEnabledGames(ALL_GAMES);
       }
     } catch (err) {
       setError((err as Error).message);

@@ -8,15 +8,13 @@ const AutomationPage = lazy(() => import("./pages/AutomationPage"));
 
 export default function GtdHome() {
   return (
-    <div className="gtd-theme">
-      <Suspense fallback={<div className="panel" style={{ padding: 20 }}>Loading tracker…</div>}>
-        <Routes>
-          <Route path="/" element={<AccountsPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/automation" element={<AutomationPage />} />
-          <Route path="*" element={<AccountsPage />} />
-        </Routes>
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="panel" style={{ padding: 20 }}>Loading tracker…</div>}>
+      <Routes>
+        <Route path="/" element={<AccountsPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/automation" element={<AutomationPage />} />
+        <Route path="*" element={<AccountsPage />} />
+      </Routes>
+    </Suspense>
   );
 }

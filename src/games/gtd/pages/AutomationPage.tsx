@@ -68,6 +68,8 @@ function ownedUnits(acc: GtdAccount | undefined) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+type StatusFilter = "all" | "trading" | "summoning" | "buying";
+
 export default function AutomationPage() {
   const [params] = useSearchParams();
   const { data: accounts } = useGtdAccounts();
@@ -77,6 +79,11 @@ export default function AutomationPage() {
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  function rejoin(username: string) {
+    save.mutate({ username, patch: { rejoin_requested_at: Date.now() } });
+  }
 
   useEffect(() => {
     const u = params.get("u");
@@ -152,12 +159,67 @@ export default function AutomationPage() {
     setTradeAddAmount((v) => Math.min(v || tradeAddMax, tradeAddMax));
   }, [tradeAddMax]);
 
+  function configFor(username: string) {
+    return configs?.find((c) => c.username === username);
+  }
+
+  function matchesStatusFilter(username: string, filter: StatusFilter) {
+    if (filter === "all") return true;
+    const c = configFor(username);
+    if (!c) return false;
+    if (filter === "trading") return !!c.auto_trade;
+    if (filter === "summoning") return !!c.loop_summon;
+    return !!c.auto_buy;
+  }
+
   const accountList = useMemo(() => {
     const real = realAccounts(accounts ?? []);
     const q = search.trim().toLowerCase();
-    const filtered = q ? real.filter((a) => a.username.toLowerCase().includes(q)) : real;
+    let filtered = q ? real.filter((a) => a.username.toLowerCase().includes(q)) : real;
+    filtered = filtered.filter((a) => matchesStatusFilter(a.username, statusFilter));
     return [...filtered].sort((a, b) => a.username.localeCompare(b.username));
-  }, [accounts, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, search, statusFilter, configs]);
+
+  // Counts across ALL real accounts (not the currently-filtered/searched
+  // list) so the filter pills always show the true "what's configured on
+  // right now" totals, letting a forgotten toggle stand out at a glance.
+  const activeCounts = useMemo(() => {
+    const real = realAccounts(accounts ?? []);
+    let trading = 0;
+    let summoning = 0;
+    let buying = 0;
+    real.forEach((a) => {
+      const c = configFor(a.username);
+      if (c?.auto_trade) trading++;
+      if (c?.loop_summon) summoning++;
+      if (c?.auto_buy) buying++;
+    });
+    return { trading, summoning, buying };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, configs]);
+
+  const onlineAccounts = useMemo(() => realAccounts(accounts ?? []).filter(isOnline), [accounts]);
+
+  function rejoinAll() {
+    onlineAccounts.forEach((a) => rejoin(a.username));
+  }
+
+  // Every account with at least one of trade/summon/buy currently on -
+  // the "oh I forgot to turn something off" panic-button target set.
+  const accountsWithSomethingOn = useMemo(() => {
+    return realAccounts(accounts ?? []).filter((a) => {
+      const c = configFor(a.username);
+      return !!(c?.auto_trade || c?.loop_summon || c?.auto_buy);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, configs]);
+
+  function turnOffAll() {
+    accountsWithSomethingOn.forEach((a) => {
+      save.mutate({ username: a.username, patch: { auto_trade: false, loop_summon: false, auto_buy: false } });
+    });
+  }
 
   const parkedCandidates = useMemo(() => {
     const q = joinServerInput.toLowerCase().trim();
@@ -221,15 +283,47 @@ export default function AutomationPage() {
   return (
     <div className="wrap" style={{ padding: 0 }}>
       <div className="panel toolbar">
-        <div className="search-box">
-          <span>🔍</span>
-          <input type="text" placeholder="Search username..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+        <button
+          className="pill red"
+          onClick={turnOffAll}
+          disabled={save.isPending || accountsWithSomethingOn.length === 0}
+          title="Turn off trade/summon/buy on every account that has any of them on"
+        >
+          Turn Off All {accountsWithSomethingOn.length > 0 ? `(${accountsWithSomethingOn.length})` : ""}
+        </button>
+        <button
+          className="pill blue"
+          onClick={rejoinAll}
+          disabled={save.isPending || onlineAccounts.length === 0}
+          title="Send every online account back into the lobby/queue"
+        >
+          Rejoin All
+        </button>
       </div>
 
       <div className="summon-layout">
         <div className="panel">
-          <div className="holders-list" style={{ padding: 10 }}>
+          <div style={{ padding: 10 }}>
+            <div className="search-box">
+              <span>🔍</span>
+              <input type="text" placeholder="Search username..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="filter-pills" style={{ marginTop: 8 }}>
+              <button className={`pill ${statusFilter === "all" ? "green" : "grey"}`} onClick={() => setStatusFilter("all")}>
+                All
+              </button>
+              <button className={`pill ${statusFilter === "trading" ? "violet" : "grey"}`} onClick={() => setStatusFilter("trading")}>
+                Trading {activeCounts.trading > 0 ? `(${activeCounts.trading})` : ""}
+              </button>
+              <button className={`pill ${statusFilter === "summoning" ? "green" : "grey"}`} onClick={() => setStatusFilter("summoning")}>
+                Summoning {activeCounts.summoning > 0 ? `(${activeCounts.summoning})` : ""}
+              </button>
+              <button className={`pill ${statusFilter === "buying" ? "blue" : "grey"}`} onClick={() => setStatusFilter("buying")}>
+                Buying {activeCounts.buying > 0 ? `(${activeCounts.buying})` : ""}
+              </button>
+            </div>
+          </div>
+          <div className="holders-list" style={{ padding: "0 10px 10px" }}>
             {accountList.length === 0 ? (
               <div className="empty-state">
                 <span className="big-emoji">🤖</span>No accounts match.
@@ -246,7 +340,24 @@ export default function AutomationPage() {
                   >
                     <span className={`status-dot ${online ? "" : "offline"}`} />
                     <span className="holder-name">{a.username}</span>
-                    <span className={`badge ${config?.auto_buy ? "on" : ""}`}>{config?.auto_buy ? "Buying" : "Idle"}</span>
+                    <div className="badges" style={{ marginLeft: "auto" }}>
+                      {config?.auto_trade && (
+                        <span className="badge on" title="Auto Trade is on">
+                          Trade
+                        </span>
+                      )}
+                      {config?.loop_summon && (
+                        <span className="badge on" title="Loop Summon is on">
+                          Summon
+                        </span>
+                      )}
+                      {config?.auto_buy && (
+                        <span className="badge on" title="Auto Buy is on">
+                          Buy
+                        </span>
+                      )}
+                      {!config?.auto_trade && !config?.loop_summon && !config?.auto_buy && <span className="badge">Idle</span>}
+                    </div>
                   </div>
                 );
               })
@@ -265,8 +376,27 @@ export default function AutomationPage() {
               <div className="holders-header">
                 <span className={`status-dot ${acc && isOnline(acc) ? "" : "offline"}`} />
                 <div className="holders-name">{selected}</div>
+                <button
+                  className="pill blue"
+                  style={{ marginLeft: "auto" }}
+                  disabled={!acc || !isOnline(acc) || save.isPending}
+                  title="Send this account back into the lobby/queue"
+                  onClick={() => rejoin(selected)}
+                >
+                  Rejoin
+                </button>
               </div>
               <div className="holders-divider" />
+
+              {acc && (
+                <div className="form-field" style={{ marginBottom: 16 }}>
+                  <label>Activity</label>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <ActivityCell acc={acc} online={isOnline(acc)} />
+                    <span className="heartbeat">{formatAge(acc)}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="triple-columns">
                 {/* ── Summon ── */}
@@ -600,55 +730,6 @@ export default function AutomationPage() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="panel" style={{ marginTop: 20 }}>
-        <div className="holders-meta-label" style={{ padding: "14px 18px 0" }}>
-          Live Activity Log
-        </div>
-        <div className="table-wrap">
-          <table className="grid-table">
-            <colgroup>
-              <col style={{ width: "20%" }} />
-              <col style={{ width: "65%" }} />
-              <col style={{ width: "15%" }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th className="left">Account</th>
-                <th className="left">Activity</th>
-                <th>Last Seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accountList.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="empty-state">
-                    <span className="big-emoji">📜</span>No accounts match.
-                  </td>
-                </tr>
-              ) : (
-                accountList.map((a) => {
-                  const on = isOnline(a);
-                  return (
-                    <tr key={a.id} className={on ? "" : "offline-row"}>
-                      <td className="left">
-                        <div className="user-cell">
-                          <span className={`status-dot ${on ? "" : "offline"}`} />
-                          <span className="name">{a.username}</span>
-                        </div>
-                      </td>
-                      <td className="left">
-                        <ActivityCell acc={a} online={on} />
-                      </td>
-                      <td className="heartbeat">{formatAge(a)}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

@@ -18,14 +18,7 @@ export const GAMES: Record<GameId, { label: string; short: string; accent: strin
   gtd: { label: "Garden Tower Defense", short: "GTD", accent: "from-emerald-500 to-green-700" },
 };
 
+/** Every game is always available — there is no per-user enable/disable toggle. */
 export function getEnabledGames(): GameId[] {
-  const raw = pb.authStore.record?.enabled_games;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((g): g is GameId => g === "ae" || g === "mm2" || g === "gtd");
-}
-
-export async function setEnabledGames(games: GameId[]): Promise<void> {
-  const id = pb.authStore.record?.id;
-  if (!id) throw new Error("not signed in");
-  await pb.collection("users").update(id, { enabled_games: games });
+  return Object.keys(GAMES) as GameId[];
 }

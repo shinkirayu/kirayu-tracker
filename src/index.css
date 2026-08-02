@@ -15,11 +15,11 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-[#0a0a0c] dark:text-zinc-100;
+  @apply bg-[#0a0a0c] text-zinc-100 antialiased;
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -64,7 +64,7 @@ body {
 /* ---- Shared shell (sidebar/top bar) retheme per active game ----
    The chrome outside each game's own pages (App.tsx's Shell) reads these
    vars so switching games re-skins the sidebar/header to match, then
-   switching to another game (or away, to /settings) switches it right back. */
+   switching to another game (or back to the home page) switches it right back. */
 [data-shell-theme="ae"] {
   --shell-accent: #b026d6;
   --shell-accent-soft: rgba(176, 38, 214, 0.12);
@@ -84,4 +84,41 @@ body {
   --shell-accent: #4f46e5;
   --shell-accent-soft: rgba(79, 70, 229, 0.12);
   --shell-gradient: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+}
+
+/* ---- Shell chrome (sidebar/header) ----
+   Reads the same --bg/--panel/--panel-border/--text/--text-dim variable
+   names GTD's farm-theme.css defines, with fallbacks matching the app's
+   normal dark palette. When .gtd-theme wraps the whole Shell (not just its
+   own inner pages, see App.tsx), these resolve to the farm palette instead,
+   so the sidebar/header/background re-skin along with everything else. */
+.shell-root {
+  background: var(--bg, #0a0a0c);
+  color: var(--text, #f4f4f5);
+  min-height: 100dvh;
+}
+.shell-surface {
+  background: color-mix(in srgb, var(--panel, #0a0a0c) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+/* .gtd-theme sets its own font-family on itself, and since it now wraps the
+   whole Shell (not just GTD's own pages), that font would otherwise leak
+   into the shared sidebar/header nav too - changing their text metrics
+   (line-height) just on GTD routes and making the header render at a
+   different height than on AE/MM2, i.e. the page visibly jumping when
+   switching games. Reset it back to the app's normal font here so the
+   shared chrome's height stays identical across every game; only colors
+   (via the vars above) are meant to re-theme, not size/metrics. */
+.shell-chrome-font {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.shell-muted {
+  color: var(--text-dim, #a1a1aa);
+}
+.shell-muted:hover {
+  background: var(--panel-border, rgba(255, 255, 255, 0.06));
+  color: var(--text, #f4f4f5);
+}
+.shell-border {
+  border-color: var(--panel-border, rgb(39 39 42));
 }

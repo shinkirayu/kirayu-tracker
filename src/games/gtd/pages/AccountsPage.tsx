@@ -1,9 +1,7 @@
 import { useMemo, useState } from "react";
 import { useGtdAccounts, realAccounts } from "../hooks/useGtdAccounts";
-import { useSaveSummonConfig } from "../hooks/useSummonConfigs";
 import { useSeedsBaseline } from "../hooks/useSeedsBaseline";
 import { formatAge, formatNumber, formatSigned, isOnline } from "../lib/format";
-import { StatChip } from "../components/StatChip";
 import type { GtdAccount } from "../lib/types";
 
 const SEEDS_ICON = "https://static.wikia.nocookie.net/gtd/images/4/4b/Seeds.png/revision/latest?cb=20250807140625";
@@ -55,13 +53,8 @@ function MapCell({ acc, online }: { acc: GtdAccount; online: boolean }) {
 export default function AccountsPage() {
   const { data, isLoading } = useGtdAccounts();
   const baseline = useSeedsBaseline(data);
-  const save = useSaveSummonConfig();
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
   const [search, setSearch] = useState("");
-
-  function rejoin(username: string) {
-    save.mutate({ username, patch: { rejoin_requested_at: Date.now() } });
-  }
 
   const real = useMemo(() => realAccounts(data ?? []), [data]);
 
@@ -76,63 +69,24 @@ export default function AccountsPage() {
     return [...l].sort((a, b) => a.username.localeCompare(b.username));
   }, [real, filter, search]);
 
-  const online = useMemo(() => real.filter(isOnline), [real]);
-
-  function rejoinAll() {
-    online.forEach((a) => rejoin(a.username));
-  }
-
-  const totalSeeds = real.reduce((sum, a) => sum + (a.seeds || 0), 0);
-  const totalSeedsToday = real.reduce((sum, a) => {
-    const has = Object.prototype.hasOwnProperty.call(baseline, a.username);
-    return sum + (has ? (a.seeds || 0) - baseline[a.username] : 0);
-  }, 0);
-
   return (
     <div className="wrap" style={{ padding: 0 }}>
-      <div className="panel" style={{ padding: "14px 18px", marginBottom: 20 }}>
-          <div className="header-stats">
-            <StatChip icon="👥" iconClass="blue" value={formatNumber(real.length)} label="Accounts" />
-            <StatChip icon="🟢" iconClass="green" value={formatNumber(online.length)} label="Online Now" />
-            <StatChip
-              icon={<img src={SEEDS_ICON} alt="" />}
-              iconClass="yellow"
-              value={formatNumber(totalSeeds)}
-              label="Total Seeds"
-            />
-            <StatChip
-              icon={<img src={SEEDS_ICON} alt="" />}
-              iconClass="yellow"
-              value={formatSigned(totalSeedsToday)}
-              label="Seeds Today"
-              valueClass={totalSeedsToday > 0 ? "pos" : totalSeedsToday < 0 ? "neg" : ""}
-            />
+        <div className="panel">
+          <div className="toolbar" style={{ marginBottom: 0 }}>
+            <div className="search-box">
+              <span>🔍</span>
+              <input type="text" placeholder="Search username..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="filter-pills">
+              {(["all", "online", "offline"] as const).map((f) => (
+                <button key={f} className={`pill ${filter === f ? "green" : "grey"}`} onClick={() => setFilter(f)}>
+                  {f[0].toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="panel toolbar">
-          <div className="search-box">
-            <span>🔍</span>
-            <input type="text" placeholder="Search username..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <div className="filter-pills">
-            {(["all", "online", "offline"] as const).map((f) => (
-              <button key={f} className={`pill ${filter === f ? "green" : "grey"}`} onClick={() => setFilter(f)}>
-                {f[0].toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button
-            className="pill blue"
-            onClick={rejoinAll}
-            disabled={save.isPending || online.length === 0}
-            title="Send every online account back into the lobby/queue"
-          >
-            🔄 Rejoin All
-          </button>
-        </div>
-
-        <div className="panel table-wrap">
+          <div className="table-wrap">
           <table className="grid-table">
             <colgroup>
               <col style={{ width: "17%" }} />
@@ -142,8 +96,7 @@ export default function AccountsPage() {
               <col style={{ width: "13%" }} />
               <col style={{ width: "13%" }} />
               <col style={{ width: "9%" }} />
-              <col style={{ width: "6%" }} />
-              <col style={{ width: "10%" }} />
+              <col style={{ width: "16%" }} />
             </colgroup>
             <thead>
               <tr>
@@ -155,19 +108,18 @@ export default function AccountsPage() {
                 <th title="Rafflesia &amp; Tridenthra (Godly-tier)">Key Items</th>
                 <th>Status</th>
                 <th>Last Seen</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="loading-state">
+                  <td colSpan={8} className="loading-state">
                     <span className="big-emoji">🌱</span>Loading farm accounts...
                   </td>
                 </tr>
               ) : list.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="empty-state">
+                  <td colSpan={8} className="empty-state">
                     <span className="big-emoji">🔍</span>No accounts match.
                   </td>
                 </tr>
@@ -208,23 +160,14 @@ export default function AccountsPage() {
                         <ActionCell acc={acc} online={on} />
                       </td>
                       <td className="heartbeat">{formatAge(acc)}</td>
-                      <td>
-                        <button
-                          className="pill blue"
-                          disabled={!on || save.isPending}
-                          title="Send this account back into the lobby/queue"
-                          onClick={() => rejoin(acc.username)}
-                        >
-                          🔄
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
           </table>
-      </div>
+          </div>
+        </div>
     </div>
   );
 }

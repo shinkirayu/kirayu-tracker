@@ -62,20 +62,27 @@ export function GetScriptButton() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="rounded-full px-3.5 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white"
+        className={`nav-tab pill ${open ? "yellow" : "grey"} rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors`}
       >
         Get script
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-20 mt-1 w-72 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <div
+          className="absolute top-full right-0 z-20 mt-1 w-72 overflow-hidden rounded-lg border py-1 shadow-lg"
+          style={{ background: "var(--panel, #18181b)", borderColor: "var(--panel-border, rgba(255, 255, 255, 0.1))" }}
+        >
           {SCRIPTS.map((option) => (
             <button
               key={option.label}
               onClick={() => copy(option)}
-              className="block w-full px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-white/5"
+              className="block w-full px-3 py-2 text-left transition-colors hover:brightness-125"
             >
-              <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{option.label}</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">{option.hint}</div>
+              <div className="text-sm font-medium" style={{ color: "var(--text, #f4f4f5)" }}>
+                {option.label}
+              </div>
+              <div className="text-xs" style={{ color: "var(--text-dim, #a1a1aa)" }}>
+                {option.hint}
+              </div>
             </button>
           ))}
         </div>

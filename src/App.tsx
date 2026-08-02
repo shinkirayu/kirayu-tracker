@@ -5,13 +5,36 @@ import { queryClient } from "./lib/queryClient";
 import { pb, GAMES, getEnabledGames, type GameId } from "./lib/pocketbase";
 import { useSession } from "./hooks/useAuth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { SkeletonGrid } from "./components/Skeletons";
 import { ToastProvider } from "./components/Toast";
 import { Tooltip } from "./components/Tooltip";
 import { GetScriptButton as AeGetScriptButton } from "./games/ae/components/GetScriptButton";
 import { GetScriptButton as Mm2GetScriptButton } from "./games/mm2/components/GetScriptButton";
 import { GetScriptButton as GtdGetScriptButton } from "./games/gtd/components/GetScriptButton";
+import { StatChip } from "./games/gtd/components/StatChip";
+import { useGtdDashboardStats } from "./games/gtd/hooks/useGtdDashboardStats";
+import { formatNumber, formatSigned } from "./games/gtd/lib/format";
+
+const GTD_SEEDS_ICON = "https://static.wikia.nocookie.net/gtd/images/4/4b/Seeds.png/revision/latest?cb=20250807140625";
+
+/** GTD-only "Accounts / Online / Seeds" chips shown in the top nav, right side. */
+function GtdHeaderStats() {
+  const stats = useGtdDashboardStats();
+  return (
+    <div className="header-stats">
+      <StatChip icon="👥" iconClass="blue" value={formatNumber(stats.total)} label="Accounts" />
+      <StatChip icon="🟢" iconClass="green" value={formatNumber(stats.online)} label="Online Now" />
+      <StatChip icon={<img src={GTD_SEEDS_ICON} alt="" />} iconClass="yellow" value={formatNumber(stats.totalSeeds)} label="Total Seeds" />
+      <StatChip
+        icon={<img src={GTD_SEEDS_ICON} alt="" />}
+        iconClass="yellow"
+        value={formatSigned(stats.totalSeedsToday)}
+        label="Seeds Today"
+        valueClass={stats.totalSeedsToday > 0 ? "pos" : stats.totalSeedsToday < 0 ? "neg" : ""}
+      />
+    </div>
+  );
+}
 
 const GAME_ICON_SRC: Record<GameId, string> = {
   ae: "/game-icons/ae.png",
@@ -60,22 +83,38 @@ function HamburgerIcon({ className }: { className?: string }) {
 }
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
 const AeHome = lazy(() => import("./games/ae/AeHome"));
 const Mm2Home = lazy(() => import("./games/mm2/Mm2Home"));
 const GtdHome = lazy(() => import("./games/gtd/GtdHome"));
 
-function NavItem({ to, end, children }: { to: string; end?: boolean; children: React.ReactNode }) {
+/** GTD pill colors — same red/blue/violet/yellow system as Turn Off All/Rejoin
+ * All, one distinct color per tab instead of a generic active/inactive
+ * green-vs-grey scheme. Ignored for AE/MM2 tabs (no .pill CSS outside .gtd-theme).
+ * Tabs stay grey until they're the current page - color only shows once clicked. */
+type NavColor = "green" | "blue" | "violet" | "yellow";
+
+function NavItem({
+  to,
+  end,
+  children,
+  color,
+}: {
+  to: string;
+  end?: boolean;
+  children: React.ReactNode;
+  color?: NavColor;
+}) {
   return (
     <NavLink
       to={to}
       end={end}
       className={({ isActive }) =>
-        `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-300 ${
-          isActive
-            ? "bg-[var(--shell-accent)] text-white shadow-sm"
-            : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white"
-        }`
+        color
+          ? `nav-tab pill ${isActive ? color : "grey"} rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-300`
+          : `nav-tab rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-300 ${
+              isActive ? "bg-[var(--shell-accent)] text-white shadow-sm" : "shell-muted"
+            }`
       }
     >
       {children}
@@ -83,7 +122,7 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
   );
 }
 
-const GAME_TABS: Partial<Record<GameId, { to: string; label: string }[]>> = {
+const GAME_TABS: Partial<Record<GameId, { to: string; label: string; color?: NavColor }[]>> = {
   ae: [
     { to: "/ae", label: "Accounts" },
     { to: "/ae/units", label: "Units" },
@@ -97,9 +136,9 @@ const GAME_TABS: Partial<Record<GameId, { to: string; label: string }[]>> = {
     { to: "/mm2/items", label: "Items" },
   ],
   gtd: [
-    { to: "/gtd", label: "Accounts" },
-    { to: "/gtd/inventory", label: "Inventory" },
-    { to: "/gtd/automation", label: "Automation" },
+    { to: "/gtd", label: "Accounts", color: "green" },
+    { to: "/gtd/inventory", label: "Inventory", color: "blue" },
+    { to: "/gtd/automation", label: "Automation", color: "violet" },
   ],
 };
 
@@ -109,7 +148,7 @@ function GameTabs({ id }: { id: GameId }) {
   return (
     <nav className="flex items-center gap-1">
       {tabs.map((t) => (
-        <NavItem key={t.to} to={t.to} end={t.to === `/${id}`}>
+        <NavItem key={t.to} to={t.to} end={t.to === `/${id}`} color={t.color}>
           {t.label}
         </NavItem>
       ))}
@@ -139,18 +178,24 @@ function GameIcon({ id }: { id: GameId }) {
   );
 }
 
-function Sidebar() {
+function Sidebar({ open }: { open: boolean }) {
   const enabled = getEnabledGames();
 
   return (
-    <aside className="sticky top-0 flex h-dvh w-[72px] shrink-0 flex-col items-center gap-3 border-r border-zinc-200/80 bg-white/80 py-4 backdrop-blur dark:border-white/10 dark:bg-[#0a0a0c]/85">
+    <aside
+      className={`shell-surface shell-chrome-font sticky top-0 flex h-dvh shrink-0 flex-col items-center gap-3 overflow-hidden border-r py-4 transition-[width,opacity,transform] duration-300 ease-in-out ${
+        open ? "w-[72px] translate-x-0 opacity-100" : "w-0 -translate-x-2 opacity-0"
+      }`}
+      style={{ borderRightColor: open ? "var(--panel-border, rgba(255, 255, 255, 0.1))" : "transparent" }}
+      aria-hidden={!open}
+    >
       <Link
         to="/"
-        className="flex size-10 items-center justify-center rounded-xl bg-[var(--shell-accent)] text-sm font-bold text-white shadow-sm transition-colors duration-300"
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shell-accent)] text-sm font-bold text-white shadow-sm transition-colors duration-300"
       >
         K
       </Link>
-      {enabled.length > 0 && <div className="h-px w-8 bg-[var(--shell-accent-soft)] transition-colors duration-300" />}
+      {enabled.length > 0 && <div className="h-px w-8 shrink-0 bg-[var(--shell-accent-soft)] transition-colors duration-300" />}
       <nav className="flex flex-col items-center gap-2.5">
         {enabled.map((id) => (
           <GameIcon key={id} id={id} />
@@ -165,35 +210,39 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, toggleSidebar] = useSidebarOpen();
 
   return (
-    <div className="flex min-h-dvh" data-shell-theme={activeGame ?? "default"}>
-      {sidebarOpen && <Sidebar />}
+    <div
+      className={`shell-root flex min-h-dvh ${activeGame === "gtd" ? "gtd-theme" : ""}`}
+      data-shell-theme={activeGame ?? "default"}
+    >
+      <Sidebar open={sidebarOpen} />
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-40 border-b-2 border-[var(--shell-accent)]/40 bg-white/80 backdrop-blur transition-colors duration-300 dark:bg-[#0a0a0c]/85">
-          <div className="flex items-center gap-1.5 px-4 py-3">
+        <header
+          className="shell-surface shell-chrome-font sticky top-0 z-40 border-b-2 transition-colors duration-300"
+          style={{ borderBottomColor: "var(--shell-accent)" }}
+        >
+          {/* Fixed height (not content-driven padding) so the header renders
+              at the exact same height on every game, regardless of what's
+              in the right-hand cluster (GTD's stat chips/chunky pills vs
+              AE/MM2's plainer buttons) - otherwise switching games visibly
+              shifts the page. */}
+          <div className="flex h-16 items-center gap-1.5 px-4">
             <button
               onClick={toggleSidebar}
               aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-              className="rounded-lg border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"
+              className="shell-muted rounded-lg border p-2 transition-colors"
+              style={{ borderColor: "var(--panel-border, rgba(255, 255, 255, 0.1))" }}
             >
-              <HamburgerIcon className="size-4" />
+              <HamburgerIcon className={`size-4 transition-transform duration-300 ease-in-out ${sidebarOpen ? "" : "rotate-180"}`} />
             </button>
-            {activeGame && (
-              <>
-                <span className="text-sm font-semibold tracking-tight text-[var(--shell-accent)] transition-colors duration-300">
-                  {GAMES[activeGame].label}
-                </span>
-                <GameTabs id={activeGame} />
-              </>
-            )}
-            <div className="ml-auto flex items-center gap-1.5">
+            {activeGame && <GameTabs id={activeGame} />}
+            <div className="ml-auto flex items-center gap-3">
+              {activeGame === "gtd" && <GtdHeaderStats />}
               {activeGame === "ae" && <AeGetScriptButton />}
               {activeGame === "mm2" && <Mm2GetScriptButton />}
               {activeGame === "gtd" && <GtdGetScriptButton />}
-              <ThemeToggle />
-              <NavItem to="/settings">Settings</NavItem>
               <button
                 onClick={() => pb.authStore.clear()}
-                className="rounded-full px-3.5 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white"
+                className="shell-muted rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors"
               >
                 Sign out
               </button>
@@ -224,18 +273,14 @@ function Gate() {
     );
   }
 
-  const enabled = getEnabledGames();
-  const firstGame = enabled[0];
-
   return (
     <Shell>
       <Suspense fallback={<SkeletonGrid count={6} />}>
         <Routes>
-          <Route path="/" element={<Navigate to={firstGame ? `/${firstGame}` : "/settings"} replace />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/ae/*" element={<AeHome />} />
           <Route path="/mm2/*" element={<Mm2Home />} />
           <Route path="/gtd/*" element={<GtdHome />} />
-          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

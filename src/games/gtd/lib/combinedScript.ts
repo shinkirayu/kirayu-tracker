@@ -2334,22 +2334,52 @@ local function FetchTradeConfig()
 	return data.items[1]
 end
 
+local TeleportService = game:GetService("TeleportService")
+
+-- TeleportToPlaceInstance/Teleport only error synchronously for malformed
+-- arguments - a bad/expired job id, full server, or other real failure
+-- surfaces later via this event instead, and was previously going
+-- completely unlogged (looked like the join just silently did nothing).
+TeleportService.TeleportInitFailed:Connect(function(_, teleportResult, errorMessage)
+	warn(
+		"[Kirayu Headless] Trade: join to "
+			.. tostring(TradeConfig.TargetPlayer)
+			.. "'s server failed ("
+			.. tostring(teleportResult)
+			.. "): "
+			.. tostring(errorMessage)
+			.. " - will retry."
+	)
+end)
+
+local lastJoinAttemptAt = 0
+local JOIN_RETRY_COOLDOWN = 8 -- seconds between join attempts, so a failed/slow teleport doesn't get retried every trade-loop tick
+
 -- Fallback: target has no known parked job id, so keep leaving/rejoining
 -- until matchmaking happens to land both accounts together.
 local function hopServer()
+	if tick() - lastJoinAttemptAt < JOIN_RETRY_COOLDOWN then
+		return
+	end
+	lastJoinAttemptAt = tick()
 	print("[Kirayu Headless] Trade: target not seen for a while - hopping to another server.")
 	pushHudLog("Hopping servers for " .. TradeConfig.TargetPlayer .. "...")
-	local TeleportService = game:GetService("TeleportService")
 	pcall(TeleportService.Teleport, TeleportService, GTD_PLACE_ID, LocalPlayer)
 end
 
 -- Preferred: target is parked in a known server (lobby_parker.lua reports its
 -- job id into trade_target_job_id) - join that exact instance directly.
+-- Called as soon as the target isn't found in the current server (no 15s
+-- wait-and-see, since a known job id means there's nothing to wait for);
+-- JOIN_RETRY_COOLDOWN above debounces the repeated calls that produces.
 local function joinTargetServer()
 	if TradeConfig.TargetJobId ~= "" then
+		if tick() - lastJoinAttemptAt < JOIN_RETRY_COOLDOWN then
+			return
+		end
+		lastJoinAttemptAt = tick()
 		print("[Kirayu Headless] Trade: joining parked server " .. TradeConfig.TargetJobId .. " for " .. TradeConfig.TargetPlayer .. ".")
 		pushHudLog("Joining " .. TradeConfig.TargetPlayer .. "'s server...")
-		local TeleportService = game:GetService("TeleportService")
 		local ok = pcall(TeleportService.TeleportToPlaceInstance, TeleportService, GTD_PLACE_ID, TradeConfig.TargetJobId, LocalPlayer)
 		if ok then
 			return
@@ -2458,7 +2488,12 @@ local function runTradeLoop()
 					end
 				end
 				if not target then
-					if not targetMissingSince then
+					if TradeConfig.TargetJobId ~= "" then
+						-- Known parked server - nothing to wait and see
+						-- about, go straight there (joinTargetServer's own
+						-- cooldown debounces this firing every tick).
+						joinTargetServer()
+					elseif not targetMissingSince then
 						targetMissingSince = tick()
 						pushHudLog("Waiting for " .. TradeConfig.TargetPlayer .. "...")
 					elseif tick() - targetMissingSince > TARGET_HOP_TIMEOUT then
