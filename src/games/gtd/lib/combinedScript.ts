@@ -2562,14 +2562,18 @@ local function runTradeLoop()
 					else
 						local finalBtn = tradeGui.Items.Container.Items.Right.Controls.Items.Buttons:FindFirstChild("Accept")
 						if finalBtn then
-							local label = finalBtn:FindFirstChildWhichIsA("TextLabel", true) or finalBtn
-							local waitStart = tick()
-							repeat
-								task.wait(0.5)
-							until label.Text == "Accept" or label.Text == "READY" or not moreBtn.Visible or tick() - waitStart > 30
-							if moreBtn.Visible then
+							-- The label text is not a reliable signal: once
+							-- accepted, this "Accept" button just becomes
+							-- invisible and a separate "Unaccept" button (at
+							-- the same screen position) takes its place -
+							-- the Accept label's own .Text never changes.
+							-- Re-clicking based on label text kept landing on
+							-- Unaccept instead once hidden, undoing our own
+							-- acceptance every pass. Check Visible instead:
+							-- only click while Accept is actually shown.
+							if finalBtn.Visible then
 								clickGui(finalBtn)
-								task.wait(4)
+								task.wait(1)
 							end
 						end
 					end

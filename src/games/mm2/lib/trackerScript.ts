@@ -4,6 +4,8 @@
  * the new source in here too (Vercel builds with Root Directory=dashboard, so
  * this can't just import the file from outside the dashboard/ folder).
  */
+export const TRACKER_VERSION = "2";
+
 const TRACKER_TEMPLATE = String.raw`--!nonstrict
 --[[
 	Murder Mystery 2 - Account Data Tracker (v1)
@@ -567,5 +569,5 @@ return {
 `;
 
 export function buildTrackerScript(endpoint: string): string {
-  return TRACKER_TEMPLATE.replace("__INGEST_ENDPOINT__", endpoint);
+  return `-- Kirayu MM2 tracker v${TRACKER_VERSION}\n${TRACKER_TEMPLATE.replace("__INGEST_ENDPOINT__", endpoint)}`;
 }

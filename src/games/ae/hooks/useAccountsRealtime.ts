@@ -1,25 +1,44 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { pb } from "../lib/pocketbase";
-import type { AccountRow } from "../lib/types";
+import type { AccountListRow, AccountRow } from "../lib/types";
+
+type AccountsPages = { pages: Array<{ rows: AccountListRow[]; hasMore: boolean }>; pageParams: unknown[] };
 
 /**
  * Subscribe to changes on the `ae_accounts` collection. API rules already
  * scope every record to accounts this dashboard user owns, so any event that
- * reaches the client is guaranteed to be one of theirs. On any
- * create/update/delete, invalidate the list + stats queries so they refetch.
+ * reaches the client is guaranteed to be one of theirs. Loaded rows are
+ * patched in place; the periodic query reconciles additions and ordering.
  */
 export function useAccountsRealtime() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    let statsTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
 
     pb.collection("ae_accounts")
-      .subscribe("*", () => {
-        queryClient.invalidateQueries({ queryKey: ["ae-accounts"] });
-        queryClient.invalidateQueries({ queryKey: ["ae-dashboard-stats"] });
+      .subscribe<AccountListRow>("*", (event) => {
+        queryClient.setQueriesData<AccountsPages>({ queryKey: ["ae-accounts"] }, (cached) => {
+          if (!cached) return cached;
+          let changed = false;
+          const pages = cached.pages.map((page) => {
+            const index = page.rows.findIndex((row) => row.user_id === event.record.user_id);
+            if (index === -1) return page;
+            changed = true;
+            const rows = [...page.rows];
+            if (event.action === "delete") rows.splice(index, 1);
+            else rows[index] = { ...rows[index], ...event.record };
+            return { ...page, rows };
+          });
+          return changed ? { ...cached, pages } : cached;
+        });
+        if (statsTimer) clearTimeout(statsTimer);
+        statsTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["ae-dashboard-stats"], refetchType: "active" });
+        }, 750);
       })
       .then((unsub) => {
         if (cancelled) unsub();
@@ -28,6 +47,7 @@ export function useAccountsRealtime() {
 
     return () => {
       cancelled = true;
+      if (statsTimer) clearTimeout(statsTimer);
       unsubscribe?.();
     };
   }, [queryClient]);

@@ -1,5 +1,5 @@
 import { useRegenerateTrackerToken, useTrackerToken } from "../hooks/useTrackerToken";
-import { buildTrackerScript } from "../lib/trackerScript";
+import { buildTrackerScript, TRACKER_VERSION } from "../lib/trackerScript";
 import { useToast } from "../../../components/Toast";
 
 const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL as string;
@@ -13,8 +13,12 @@ export function GetScriptButton() {
   async function copyScript() {
     if (!token) return;
     const endpoint = `${POCKETBASE_URL}/api/ae/ingest?key=${token}`;
-    await navigator.clipboard.writeText(buildTrackerScript(endpoint));
-    toast.success("Copied!", "Paste it into your Roblox executor while Anime Expeditions is open, then run it.");
+    try {
+      await navigator.clipboard.writeText(buildTrackerScript(endpoint));
+      toast.success(`Tracker v${TRACKER_VERSION} copied`, "Paste it into your Roblox executor while Anime Expeditions is open, then run it.");
+    } catch (error) {
+      toast.error("Couldn't copy the script", error instanceof Error ? error.message : "Allow clipboard access and try again.");
+    }
   }
 
   function regenerateToken() {

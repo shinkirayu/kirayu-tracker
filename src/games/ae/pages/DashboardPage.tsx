@@ -13,6 +13,7 @@ import { UnitsModal } from "../components/UnitsModal";
 import { FilterBar } from "../components/FilterBar";
 import { StatTiles } from "../components/StatTiles";
 import { SkeletonGrid, SkeletonTiles } from "../../../components/Skeletons";
+import { TrackerHealth } from "../../../components/TrackerHealth";
 
 export default function DashboardPage() {
   const [searchInput, setSearchInput] = useState("");
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   useEffect(() => saveColumnPrefs(columns), [columns]);
 
   const { owners: secretOwners, traits: secretTraits } = useSecretOwners();
-  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(
+  const { data, isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(
     effectiveFilters,
     secretOwners,
   );
@@ -125,6 +126,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {stats.data ? <StatTiles stats={stats.data} /> : <SkeletonTiles />}
+      <TrackerHealth reports={accounts} />
 
       <FilterBar
         searchInput={searchInput}
@@ -161,8 +163,14 @@ export default function DashboardPage() {
       )}
 
       {isError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-500/10 dark:text-red-300">
-          Failed to load accounts: {(error as Error)?.message}
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-500/10 dark:text-red-300">
+          <span>Failed to load accounts: {(error as Error)?.message}</span>
+          <button
+            onClick={() => void refetch()}
+            className="shrink-0 rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-400/40 dark:bg-red-950 dark:text-red-200"
+          >
+            Retry
+          </button>
         </div>
       )}
 
