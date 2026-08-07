@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { AccountRow } from "../lib/types";
 import { useEditAccount, type AccountPatch } from "../hooks/useEditAccount";
 import { useToast } from "../../../components/Toast";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

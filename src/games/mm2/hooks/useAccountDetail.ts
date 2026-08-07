@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
-import { REFRESH } from "../lib/queryClient";
+import { pb } from "../../../lib/pocketbase";
+import { REFRESH } from "../../../lib/queryClient";
 import type { AccountDetailsRow, AccountRow } from "../lib/types";
 
 /** Light row for the detail header — cheap, cached separately from the list. */

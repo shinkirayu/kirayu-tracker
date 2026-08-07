@@ -17,8 +17,3 @@ export const GAMES: Record<GameId, { label: string; short: string; accent: strin
   mm2: { label: "Murder Mystery 2", short: "MM2", accent: "from-red-500 to-red-800" },
   gtd: { label: "Garden Tower Defense", short: "GTD", accent: "from-emerald-500 to-green-700" },
 };
-
-/** Every game is always available — there is no per-user enable/disable toggle. */
-export function getEnabledGames(): GameId[] {
-  return Object.keys(GAMES) as GameId[];
-}

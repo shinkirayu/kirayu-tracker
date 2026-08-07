@@ -14,7 +14,7 @@ import { DEFAULT_UNIT_COLUMNS, UnitsShowcaseCard } from "./UnitsShowcaseCard";
 import { DEFAULT_ITEM_COLUMNS, InventoryShowcaseCard } from "./InventoryShowcaseCard";
 import { DEFAULT_EQUIPMENT_COLUMNS, EquipmentShowcaseCard } from "./EquipmentShowcaseCard";
 import { StatsShowcaseCard } from "./StatsShowcaseCard";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import { useToast } from "../../../components/Toast";
 
 const SHOWCASE_TYPES = ["hero", "units", "inventory", "equipment", "stats"] as const;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getZeusXAuthStatus } from "../lib/zeusx";
 import { NewZeusXListingView } from "./zeusx/NewZeusXListingView";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import type { AccountDetailsRow, AccountRow } from "../lib/types";
 
 interface Props {

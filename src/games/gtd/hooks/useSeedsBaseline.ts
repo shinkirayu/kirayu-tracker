@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import { localDateStr } from "../lib/format";
 import type { GtdAccount } from "../lib/types";
 import { realAccounts } from "./useGtdAccounts";

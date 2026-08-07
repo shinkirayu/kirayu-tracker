@@ -56,7 +56,7 @@ end)
 
 -- ── PocketBase reporting (same collection/shape as headless-kaitun.lua's
 -- syncTracker, but stripped down to just the fields a parked account needs) ──
-local TRACKER_URL = "https://kirayu-server.krayonstore-gtd.store"
+local TRACKER_URL = "https://kirayutracker.online"
 local TRACKER_JSON_HEADERS = { ["Content-Type"] = "application/json" }
 local trackerRequestFunc = request
 local trackerRecordId = nil

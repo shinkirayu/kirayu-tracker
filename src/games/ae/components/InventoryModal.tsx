@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useAccountDetails } from "../hooks/useAccountDetail";
 import type { AccountListRow } from "../lib/types";
 import { ItemCard } from "./ItemCard";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 
 export function InventoryModal({
   account,

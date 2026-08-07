@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { UnitEntry } from "../lib/types";
 
 export interface OwnedUnit extends UnitEntry {

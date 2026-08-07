@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { ShopUnit } from "../lib/types";
 
 /** Real lobby shop units scraped by the farm script into gtd_shop_units (unit_id/name/price) — not a guessed static catalog. */

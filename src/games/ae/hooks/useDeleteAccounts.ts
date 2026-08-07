@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 
 /** Removes accounts (and their cascaded ae_account_details) from tracking entirely. PocketBase has no bulk delete-by-filter over the SDK, so each id is looked up and deleted individually. */
 export function useDeleteAccounts() {

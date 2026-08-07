@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 
 /** Sparse patch — only the keys present are written by /api/mm2/edit-account. */
 export interface AccountPatch {

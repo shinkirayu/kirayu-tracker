@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { AccountDetailsRow, AccountRow } from "../lib/types";
 import { useToast } from "../../../components/Toast";
 import { DownloadIcon, UploadIcon } from "./icons";

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { GtdAccount } from "../lib/types";
 
 const FIELDS = "id,username,seeds,status,action,updated_at,lobby,x2_seeds,x3_speed,inventory,parked_job_id,games_won,wave,units,lucky_blocks";

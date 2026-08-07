@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccounts, useDashboardStats } from "../hooks/useAccounts";
 import { useAccountsRealtime } from "../hooks/useAccountsRealtime";
 import { useDeleteAccounts } from "../hooks/useDeleteAccounts";
-import { useDebounce } from "../hooks/useDebounce";
+import { useDebounce } from "../../../hooks/useDebounce";
 import type { AccountFilters } from "../lib/types";
 import { loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from "../lib/columnPrefs";
 import { AccountRow } from "../components/AccountRow";

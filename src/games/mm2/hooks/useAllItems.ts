@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { ItemCategory, ItemEntry } from "../lib/types";
 
 export interface OwnedItem extends ItemEntry {

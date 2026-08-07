@@ -9,7 +9,7 @@
 const SCRIPT = String.raw`-- ============================================
 --  REMOTE CONFIG (pulled from PocketBase)
 -- ============================================
-local PB_URL = "https://kirayu-server.krayonstore-gtd.store"
+local PB_URL = "https://kirayutracker.online"
 local CONFIG_POLL_INTERVAL = 5    -- seconds between config re-fetches
 
 -- ============================================

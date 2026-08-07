@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { pb } from "../lib/pocketbase";
-import { REFRESH } from "../lib/queryClient";
+import { pb } from "../../../lib/pocketbase";
+import { REFRESH } from "../../../lib/queryClient";
 import type { SecretUnitName } from "./useSecretOwners";
 import {
   ACCOUNT_LIST_COLUMNS,

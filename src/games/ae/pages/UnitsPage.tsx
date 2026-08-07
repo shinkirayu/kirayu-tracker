@@ -7,7 +7,7 @@ import { RARITY_ORDER, rarityBoxStyle, rarityClass } from "../lib/format";
 import { buildDefaultDescription, buildDefaultTitle } from "../lib/eldoradoDescribe";
 import { isAccountListed } from "../lib/listedAccounts";
 import { StarIcon, SwordIcon } from "../components/icons";
-import { CloseButton } from "../components/CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import { EldoradoListingModal } from "../components/EldoradoListingModal";
 import { BulkAutoListModal } from "../components/eldorado/BulkAutoListModal";
 import { ZeusXListingModal } from "../components/ZeusXListingModal";

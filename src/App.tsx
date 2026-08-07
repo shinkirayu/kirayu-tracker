@@ -2,7 +2,7 @@ import { Suspense, lazy, useState } from "react";
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { pb, GAMES, getEnabledGames, type GameId } from "./lib/pocketbase";
+import { pb, GAMES, type GameId } from "./lib/pocketbase";
 import { useSession } from "./hooks/useAuth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SkeletonGrid } from "./components/Skeletons";
@@ -179,7 +179,7 @@ function GameIcon({ id }: { id: GameId }) {
 }
 
 function Sidebar({ open }: { open: boolean }) {
-  const enabled = getEnabledGames();
+  const enabled = Object.keys(GAMES) as GameId[];
 
   return (
     <aside

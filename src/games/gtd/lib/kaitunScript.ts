@@ -309,7 +309,7 @@ local function ensureAutoEquipUnits()
 	end
 end
 
-local TRACKER_URL = "https://kirayu-server.krayonstore-gtd.store"
+local TRACKER_URL = "https://kirayutracker.online"
 local TRACKER_FORCE_INTERVAL = 120
 local TRACKER_FALLBACK_INTERVAL = 15
 

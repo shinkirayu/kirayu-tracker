@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
-import { REFRESH } from "../lib/queryClient";
+import { pb } from "../../../lib/pocketbase";
+import { REFRESH } from "../../../lib/queryClient";
 import {
   ACCOUNT_LIST_COLUMNS,
   ONLINE_WINDOW_MS,

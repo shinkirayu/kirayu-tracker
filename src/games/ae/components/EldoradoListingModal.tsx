@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getAuthState } from "../lib/eldorado";
 import { NewListingView } from "./eldorado/NewListingView";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import type { AccountDetailsRow, AccountRow } from "../lib/types";
 
 interface Props {

@@ -8,7 +8,7 @@
  * directly — so there's nothing to fill in per user, just copy and run.
  */
 const TRACKER_SCRIPT = String.raw`-- ⚙️ CONFIG
-local PB_URL         = "https://kirayu-server.krayonstore-gtd.store"
+local PB_URL         = "https://kirayutracker.online"
 local SEND_INTERVAL  = 30    -- seconds between syncs
 local FORCE_INTERVAL = 300   -- force sync even if nothing changed
 

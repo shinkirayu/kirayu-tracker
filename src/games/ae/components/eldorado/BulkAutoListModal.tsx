@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type { ClientResponseError } from "pocketbase";
-import { pb } from "../../lib/pocketbase";
+import { pb } from "../../../../lib/pocketbase";
 import { useToast } from "../../../../components/Toast";
 import { Dropdown } from "../Dropdown";
-import { CloseButton } from "../CloseButton";
+import { CloseButton } from "../../../../components/CloseButton";
 import { AccountShowcaseCard } from "../AccountShowcaseCard";
 import { DEFAULT_UNIT_COLUMNS, UnitsShowcaseCard } from "../UnitsShowcaseCard";
 import { DEFAULT_ITEM_COLUMNS, InventoryShowcaseCard } from "../InventoryShowcaseCard";

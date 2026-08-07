@@ -16,7 +16,7 @@ import {
   timeAgo,
 } from "../lib/format";
 import { downloadDataUrl } from "../lib/exportShowcase";
-import { BarChart } from "../components/BarChart";
+import { BarChart } from "../../../components/BarChart";
 import { AssetImage } from "../components/AssetImage";
 import { CROW_RELIC_ICON } from "../lib/assetIcon";
 import { wikiItemIconUrl } from "../lib/itemImages";

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 import type { AccountListRow, AccountRow } from "../lib/types";
 
 type AccountsPages = { pages: Array<{ rows: AccountListRow[]; hasMore: boolean }>; pageParams: unknown[] };

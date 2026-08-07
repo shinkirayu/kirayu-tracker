@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { pb } from "../lib/pocketbase";
+import { pb } from "../../../lib/pocketbase";
 
 /** Each dashboard user has exactly one tracker token, lazily issued on first call. */
 export function useTrackerToken() {

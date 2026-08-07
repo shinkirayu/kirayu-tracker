@@ -6,7 +6,7 @@ import { ITEM_CATEGORIES, RARITY_ORDER, type ItemCategory } from "../lib/types";
 import { rarityBoxStyle, rarityHex } from "../lib/format";
 import { wikiItemIconCandidates } from "../lib/itemImages";
 import { AssetImage } from "../components/AssetImage";
-import { CloseButton } from "../components/CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import { BagIcon, EffectIcon, EmoteIcon, KnifeIcon, MaskIcon, PawIcon, RadioIcon } from "../components/icons";
 
 const CATEGORY_ICONS: Record<ItemCategory, (p: { className?: string }) => React.ReactElement> = {

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useAccountDetails } from "../hooks/useAccountDetail";
 import { fmtNum, rarityBoxStyle } from "../lib/format";
 import type { AccountListRow, UnitEntry } from "../lib/types";
-import { CloseButton } from "./CloseButton";
+import { CloseButton } from "../../../components/CloseButton";
 import { SwordIcon } from "./icons";
 import { UnitIconImage } from "./UnitIconImage";
 
